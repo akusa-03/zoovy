@@ -62,10 +62,11 @@ class PaymentGatekeeper:
         return selected
 
     @staticmethod
-    def prompt_user_confirmation(review: OrderCheckoutReview) -> bool:
+    def prompt_user_confirmation(review: OrderCheckoutReview) -> str:
         """
         Renders a rich terminal invoice displaying exact item descriptions,
         quantities, prices, and delivery address before checkout.
+        Returns 'confirm', 'modify', or 'abort'.
         """
         table = Table(title=f"🛒 Cart Inspection & Invoice: {review.platform.upper()} ({review.store_name})", expand=True)
         table.add_column("Item & Description", style="cyan", ratio=3)
@@ -105,7 +106,15 @@ class PaymentGatekeeper:
         ))
 
         try:
-            choice = input("\nConfirm this cart and open browser to payment view? [y/N]: ").strip().lower()
-            return choice in ["y", "yes"]
+            console.print("\n[bold cyan]Order Actions:[/bold cyan]")
+            console.print("  [bold green][y][/bold green] Confirm & proceed to payment")
+            console.print("  [bold yellow][m][/bold yellow] Modify cart in browser (add/remove items or adjust quantities)")
+            console.print("  [bold red][n][/bold red] Abort order")
+            choice = input("\nSelect action [y/m/N]: ").strip().lower()
+            if choice in ["y", "yes"]:
+                return "confirm"
+            elif choice in ["m", "modify"]:
+                return "modify"
+            return "abort"
         except (KeyboardInterrupt, EOFError):
-            return False
+            return "abort"

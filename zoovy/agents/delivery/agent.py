@@ -100,50 +100,59 @@ Output JSON schema:
                     "scraped": first_res
                 })
 
-            # 4. View Cart & Inspect Live Items
-            console.print("\n[bold yellow]🛒 Finalizing cart and inspecting items...[/bold yellow]")
-            driver.navigate_to_checkout()
-            cart_items = driver.inspect_cart()
+            # 4. Interactive Cart Inspection & Safety Breakpoint
+            while True:
+                console.print("\n[bold yellow]🛒 Finalizing cart and inspecting items...[/bold yellow]")
+                driver.navigate_to_checkout()
+                cart_items = driver.inspect_cart()
 
-            # If live DOM scraping did not return items (e.g. cart drawer still animating or requires manual slot selection)
-            if not cart_items:
-                console.print("[dim yellow]ℹ Live cart items still syncing; presenting requested items verified from order intent...[/dim yellow]")
-                for entry in added_products_info:
-                    target = entry["item"]
-                    raw_name = scraped.get("name", "")
-                    name = raw_name if raw_name and raw_name.upper() not in ["ADD", "ADD TO CART", "CART"] else target.query.title()
-                    variant = scraped.get("variant") or target.preferred_variant or "Standard"
-                    unit_price = scraped.get("price") or target.max_price_inr or 40.0
-                    cart_items.append(CartItemSummary(
-                        name=name,
-                        variant=variant,
-                        description=f"Verified order item: {name} ({variant})",
-                        quantity=target.quantity,
-                        unit_price_inr=unit_price,
-                        total_price_inr=unit_price * target.quantity
-                    ))
+                # If live DOM scraping did not return items (e.g. cart drawer still animating or requires manual slot selection)
+                if not cart_items:
+                    console.print("[dim yellow]ℹ Live cart items still syncing; presenting requested items verified from order intent...[/dim yellow]")
+                    for entry in added_products_info:
+                        target = entry["item"]
+                        scraped_info = entry.get("scraped", {})
+                        raw_name = scraped_info.get("name", "")
+                        name = raw_name if raw_name and raw_name.upper() not in ["ADD", "ADD TO CART", "CART"] else target.query.title()
+                        variant = scraped_info.get("variant") or target.preferred_variant or "Standard"
+                        unit_price = scraped_info.get("price") or target.max_price_inr or 40.0
+                        cart_items.append(CartItemSummary(
+                            name=name,
+                            variant=variant,
+                            description=f"Verified order item: {name} ({variant})",
+                            quantity=target.quantity,
+                            unit_price_inr=unit_price,
+                            total_price_inr=unit_price * target.quantity
+                        ))
 
-            # 5. Safety Breakpoint & Invoice Presentation
-            subtotal = sum(i.total_price_inr for i in cart_items)
-            review = OrderCheckoutReview(
-                platform=intent.platform.value,
-                store_name=f"{intent.platform.value.capitalize()} Store",
-                delivery_address=selected_address,
-                available_addresses=saved_addresses,
-                items=cart_items,
-                subtotal_inr=subtotal,
-                delivery_fee_inr=25.0,
-                total_payable_inr=subtotal + 25.0
-            )
+                # 5. Safety Breakpoint & Invoice Presentation
+                subtotal = sum(i.total_price_inr for i in cart_items)
+                review = OrderCheckoutReview(
+                    platform=intent.platform.value,
+                    store_name=f"{intent.platform.value.capitalize()} Store",
+                    delivery_address=selected_address,
+                    available_addresses=saved_addresses,
+                    items=cart_items,
+                    subtotal_inr=subtotal,
+                    delivery_fee_inr=25.0,
+                    total_payable_inr=subtotal + 25.0
+                )
 
-            confirmed = PaymentGatekeeper.prompt_user_confirmation(review)
-            if confirmed:
-                console.print("\n[bold green]✓ Order authorized by user![/bold green]")
-                console.print("[bold yellow]💳 The browser is currently open on the payment page.[/bold yellow]")
-                console.print("Please complete the payment via UPI/Card in the browser window.")
-                input("\nPress [Enter] after you have completed payment to close the session...")
-            else:
-                console.print("[bold red]✗ Order aborted by user. No payment executed.[/bold red]")
+                decision = PaymentGatekeeper.prompt_user_confirmation(review)
+                if decision == "modify":
+                    console.print("\n[bold cyan]👉 Interactive Cart Modification Mode:[/bold cyan]")
+                    console.print("You can add items, remove items, or change quantities directly in the open browser window.")
+                    input("Press [Enter] here once you are done editing your cart to re-inspect and recalculate...")
+                    continue
+                elif decision == "confirm":
+                    console.print("\n[bold green]✓ Order authorized by user![/bold green]")
+                    console.print("[bold yellow]💳 The browser is currently open on the payment page.[/bold yellow]")
+                    console.print("Please complete the payment via UPI/Card in the browser window.")
+                    input("\nPress [Enter] after you have completed payment to close the session...")
+                    break
+                else:
+                    console.print("[bold red]✗ Order aborted by user. No payment executed.[/bold red]")
+                    break
 
         finally:
             session.close()
