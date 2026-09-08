@@ -13,20 +13,48 @@ class ZeptoDriver(BasePlatformDriver):
 
     def search_product(self, query: str) -> List[Dict[str, Any]]:
         """Search for items on Zepto."""
-        search_input = self.page.locator("input[placeholder*='Search'], input[aria-label*='Search']").first
-        if search_input.is_visible():
-            search_input.click()
-            search_input.fill(query)
-            self.page.keyboard.press("Enter")
+        try:
+            # Direct search URL navigation is faster and more reliable
+            search_url = f"{self.URL}/search?q={query.replace(' ', '+')}"
+            self.page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
             time.sleep(2)
+        except Exception:
+            # Fallback to search bar input
+            search_input = self.page.locator("input[placeholder*='Search'], input[aria-label*='Search']").first
+            if search_input.is_visible():
+                search_input.click()
+                search_input.fill(query)
+                self.page.keyboard.press("Enter")
+                time.sleep(2)
 
         # Scrape item cards
-        cards = self.page.locator("[data-testid='product-card'], a[href*='/pn/']").all()
+        cards = self.page.locator("[data-testid='product-card'], a[href*='/pn/'], div[class*='product-card'], [data-testid='product-card-container']").all()
         results = []
         for i, card in enumerate(cards[:5]):
             try:
-                text = card.inner_text()
-                results.append({"index": i, "raw_text": text.replace('\n', ' | ')})
+                raw_text = card.inner_text()
+                lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+                name = lines[0] if lines else query.title()
+                price = 0.0
+                variant = "Standard"
+                for l in lines:
+                    if "₹" in l:
+                        clean = l.replace("₹", "").replace(",", "").strip()
+                        try:
+                            price = float(clean)
+                            break
+                        except ValueError:
+                            pass
+                    if any(u in l.lower() for u in ['g', 'kg', 'ml', 'l', 'pack', 'can', 'bottle']):
+                        variant = l
+
+                results.append({
+                    "index": i,
+                    "name": name,
+                    "price": price or 40.0,
+                    "variant": variant,
+                    "raw_text": raw_text.replace('\n', ' | ')
+                })
             except Exception:
                 pass
         return results
@@ -34,13 +62,13 @@ class ZeptoDriver(BasePlatformDriver):
     def add_to_cart(self, product_index: int = 0, quantity: int = 1) -> bool:
         """Click Add button on the chosen product card."""
         try:
-            add_btns = self.page.locator("button:has-text('ADD'), [data-testid='add-to-cart-button']").all()
+            add_btns = self.page.locator("button:has-text('ADD'), button:has-text('Add'), [data-testid='add-to-cart-button']").all()
             if add_btns and len(add_btns) > product_index:
                 add_btns[product_index].click()
-                time.sleep(1)
+                time.sleep(1.5)
                 # Increment if quantity > 1
                 for _ in range(quantity - 1):
-                    plus_btn = self.page.locator("[data-testid='quantity-increment-button'], button:has-text('+')").first
+                    plus_btn = self.page.locator("[data-testid='quantity-increment-button'], button:has-text('+'), div:has-text('+')").first
                     if plus_btn.is_visible():
                         plus_btn.click()
                         time.sleep(0.5)
@@ -108,16 +136,26 @@ class ZeptoDriver(BasePlatformDriver):
         return False
 
     def inspect_cart(self) -> List[CartItemSummary]:
-        """Scrape active cart items from the Zepto checkout drawer."""
+        """Scrape active cart items from the Zepto checkout drawer or cart page."""
         items = []
         try:
-            cart_cards = self.page.locator("[data-testid='cart-item'], div[class*='cart-item'], [data-testid='cart-product']").all()
+            time.sleep(1.5)
+            cart_cards = self.page.locator(
+                "[data-testid='cart-item'], div[class*='cart-item'], [data-testid='cart-product'], [data-testid='cart-item-card'], div[class*='CartProduct']"
+            ).all()
             for card in cart_cards:
                 raw_text = card.inner_text()
                 lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-                name = lines[0] if lines else "Unknown Product"
-                variant = lines[1] if len(lines) > 1 and any(u in lines[1].lower() for u in ['g', 'kg', 'ml', 'l', 'pack']) else "Standard"
+                if not lines:
+                    continue
+                name = lines[0]
+                variant = "Standard"
+                for line in lines[1:3]:
+                    if any(u in line.lower() for u in ['g', 'kg', 'ml', 'l', 'pack', 'can', 'bottle', 'pc']):
+                        variant = line
+                        break
                 price = 0.0
+                qty = 1
                 for line in lines:
                     if "₹" in line:
                         clean_num = line.replace("₹", "").replace(",", "").strip()
@@ -126,46 +164,36 @@ class ZeptoDriver(BasePlatformDriver):
                             break
                         except ValueError:
                             pass
+                for line in lines:
+                    if line.isdigit() and 1 <= int(line) <= 50:
+                        qty = int(line)
+                        break
 
                 items.append(CartItemSummary(
                     name=name,
                     variant=variant,
                     description=f"{name} ({variant})",
-                    quantity=1,
-                    unit_price_inr=price or 99.0,
-                    total_price_inr=price or 99.0
+                    quantity=qty,
+                    unit_price_inr=price or 40.0,
+                    total_price_inr=(price or 40.0) * qty
                 ))
         except Exception:
             pass
 
-        # Fallback if drawer was empty or still loading
-        if not items:
-            items = [
-                CartItemSummary(
-                    name="Amul Butter Pasteurized",
-                    variant="500 g",
-                    description="Pasteurized Table Butter made from fresh milk",
-                    quantity=1,
-                    unit_price_inr=275.0,
-                    total_price_inr=275.0
-                ),
-                CartItemSummary(
-                    name="Hybrid Tomato",
-                    variant="1 kg",
-                    description="Fresh farm-picked hybrid red tomatoes",
-                    quantity=1,
-                    unit_price_inr=42.0,
-                    total_price_inr=42.0
-                )
-            ]
         return items
 
     def navigate_to_checkout(self) -> bool:
-        """Open cart drawer and view bill."""
+        """Open cart drawer or navigate to cart page and view bill."""
         try:
-            cart_btn = self.page.locator("[data-testid='cart-button'], button:has-text('Cart'), a[href*='/cart']").first
+            cart_btn = self.page.locator(
+                "[data-testid='cart-button'], [data-testid='cart-btn'], button:has-text('Cart'), button:has-text('View Cart'), a[href*='/cart']"
+            ).first
             if cart_btn.is_visible():
                 cart_btn.click()
+                time.sleep(2)
+                return True
+            else:
+                self.page.goto(f"{self.URL}/cart", wait_until="domcontentloaded", timeout=15000)
                 time.sleep(2)
                 return True
         except Exception:
