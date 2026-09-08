@@ -1,7 +1,7 @@
 import time
 from typing import List, Dict, Any
 from .base import BasePlatformDriver
-from ...core.safety import CartItemSummary
+from zoovy.core.safety import CartItemSummary
 
 
 class ZomatoDriver(BasePlatformDriver):

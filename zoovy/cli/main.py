@@ -1,16 +1,26 @@
 import argparse
 import sys
 import shutil
+import io
+import os
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn
 
-from ..core.hardware import get_hardware_profile
-from ..core.llm import OllamaClient
-from ..agents.delivery.agent import DeliveryAgent
+from zoovy.core.hardware import get_hardware_profile
+from zoovy.core.llm import OllamaClient
+from zoovy.agents.delivery.agent import DeliveryAgent
 
-console = Console()
+console = Console(highlight=False)
 
 
 def print_banner():
@@ -59,7 +69,13 @@ def cmd_doctor(args):
         model_ready = any(profile.recommended_model in m for m in installed)
         rt_table.add_row(f"Model '{profile.recommended_model}'", "[bold green]INSTALLED[/bold green]" if model_ready else "[bold yellow]NOT PULLED (Run 'zoovy setup')[/bold yellow]")
 
-    git_found = shutil.which("git") is not None
+    from pathlib import Path
+    standard_git_paths = [
+        r"C:\Program Files\Git\cmd",
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd"),
+        r"C:\Program Files\Git\bin",
+    ]
+    git_found = shutil.which("git") is not None or any((Path(p) / "git.exe").exists() for p in standard_git_paths)
     rt_table.add_row("Git CLI", "[bold green]AVAILABLE[/bold green]" if git_found else "[bold red]NOT FOUND[/bold red]")
 
     console.print(rt_table)
@@ -130,9 +146,9 @@ def main():
 
     # order
     order_parser = subparsers.add_parser("order", help="Execute autonomous delivery order")
-    order_parser.add_argument("prompt", type="str", help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
+    order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
     order_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], help="Force specific delivery platform")
-    order_parser.add_argument("--model", type="str", help="Override LLM model tag")
+    order_parser.add_argument("--model", type=str, help="Override LLM model tag")
 
     args = parser.parse_args()
     if not args.command:

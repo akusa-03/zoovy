@@ -1,13 +1,14 @@
 import sys
 import time
+from typing import Optional
 from rich.console import Console
-from ...core.llm import OllamaClient
-from ...core.safety import PaymentGatekeeper, OrderCheckoutReview
-from .schemas import OrderIntent, DeliveryPlatform
-from .browser import BrowserSessionManager
-from .platforms.zepto import ZeptoDriver
-from .platforms.swiggy import SwiggyDriver
-from .platforms.zomato import ZomatoDriver
+from zoovy.core.llm import OllamaClient
+from zoovy.core.safety import PaymentGatekeeper, OrderCheckoutReview
+from zoovy.agents.delivery.schemas import OrderIntent, DeliveryPlatform
+from zoovy.agents.delivery.browser import BrowserSessionManager
+from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
+from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
+from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
 
 console = Console()
 
@@ -59,8 +60,7 @@ Output JSON schema:
         # Launch Browser Session
         session = BrowserSessionManager(platform_name=intent.platform.value, headless=False)
         try:
-            console.print("
-[bold yellow]🌐 Launching browser with persistent session...[/bold yellow]")
+            console.print("\n[bold yellow]🌐 Launching browser with persistent session...[/bold yellow]")
             page = session.start()
 
             if intent.platform == DeliveryPlatform.ZEPTO:
@@ -75,15 +75,13 @@ Output JSON schema:
 
             # Search & Add Items
             for item in intent.items:
-                console.print(f"
-[cyan]🔍 Searching for:[/cyan] '{item.query}'...")
+                console.print(f"\n[cyan]🔍 Searching for:[/cyan] '{item.query}'...")
                 results = driver.search_product(item.query)
                 console.print(f"Adding {item.quantity}x '{item.query}' to cart...")
                 driver.add_to_cart(product_index=0, quantity=item.quantity)
 
             # View Cart & Navigate to Checkout
-            console.print("
-[bold yellow]🛒 Finalizing cart and navigating to checkout...[/bold yellow]")
+            console.print("\n[bold yellow]🛒 Finalizing cart and navigating to checkout...[/bold yellow]")
             driver.navigate_to_checkout()
             cart_items = driver.inspect_cart()
 

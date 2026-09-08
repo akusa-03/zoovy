@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from playwright.sync_api import Page
-from ...core.safety import CartItemSummary
+from zoovy.core.safety import CartItemSummary
 
 
 class BasePlatformDriver(ABC):

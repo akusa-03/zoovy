@@ -54,8 +54,7 @@ class PaymentGatekeeper:
         console.print()
         console.print(table)
         console.print(Panel(
-            f"[bold]Delivery Address:[/bold] {review.delivery_address}
-"
+            f"[bold]Delivery Address:[/bold] {review.delivery_address}\\n"
             f"[bold red]SAFETY PAUSE:[/bold red] The AI will STOP here. "
             "Please verify the cart and complete payment manually in the browser window.",
             title="🛡️ Zoovy Safety Firewall",
@@ -63,8 +62,7 @@ class PaymentGatekeeper:
         ))
 
         try:
-            choice = input("
-Complete payment manually in the opened browser? [y/N]: ").strip().lower()
+            choice = input("\nComplete payment manually in the opened browser? [y/N]: ").strip().lower()
             return choice in ["y", "yes"]
         except KeyboardInterrupt:
             return False
