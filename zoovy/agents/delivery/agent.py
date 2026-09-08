@@ -110,8 +110,8 @@ Output JSON schema:
                 console.print("[dim yellow]ℹ Live cart items still syncing; presenting requested items verified from order intent...[/dim yellow]")
                 for entry in added_products_info:
                     target = entry["item"]
-                    scraped = entry.get("scraped", {})
-                    name = scraped.get("name") or target.query.title()
+                    raw_name = scraped.get("name", "")
+                    name = raw_name if raw_name and raw_name.upper() not in ["ADD", "ADD TO CART", "CART"] else target.query.title()
                     variant = scraped.get("variant") or target.preferred_variant or "Standard"
                     unit_price = scraped.get("price") or target.max_price_inr or 40.0
                     cart_items.append(CartItemSummary(

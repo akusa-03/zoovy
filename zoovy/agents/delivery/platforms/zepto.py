@@ -17,10 +17,10 @@ class ZeptoDriver(BasePlatformDriver):
     def search_product(self, query: str) -> List[Dict[str, Any]]:
         """Search for items on Zepto."""
         try:
-            # Direct search URL navigation is faster and more reliable
-            search_url = f"{self.URL}/search?q={query.replace(' ', '+')}"
+            # Zepto uses ?query= rather than ?q=
+            search_url = f"{self.URL}/search?query={query.replace(' ', '+')}"
             self.page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
-            time.sleep(2)
+            time.sleep(2.5)
         except Exception:
             # Fallback to search bar input
             search_input = self.page.locator("input[placeholder*='Search'], input[aria-label*='Search']").first
@@ -28,33 +28,43 @@ class ZeptoDriver(BasePlatformDriver):
                 search_input.click()
                 search_input.fill(query)
                 self.page.keyboard.press("Enter")
-                time.sleep(2)
+                time.sleep(2.5)
 
         # Scrape item cards
-        cards = self.page.locator("[data-testid='product-card'], a[href*='/pn/'], div[class*='product-card'], [data-testid='product-card-container']").all()
+        cards = self.page.locator("a[href*='/pn/']").all()
         results = []
         for i, card in enumerate(cards[:5]):
             try:
-                raw_text = card.inner_text()
+                raw_text = card.inner_text().replace('\u20b9', 'Rs.')
                 lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-                name = lines[0] if lines else query.title()
+                
+                name = ""
                 price = 0.0
                 variant = "Standard"
-                for l in lines:
-                    if "₹" in l:
-                        clean = l.replace("₹", "").replace(",", "").strip()
+
+                for line in lines:
+                    if line.upper() in ["ADD", "OFF", "NEW", "BESTSELLER"] or "%" in line:
+                        continue
+                    if "Rs." in line:
                         try:
-                            price = float(clean)
-                            break
+                            clean_num = line.replace("Rs.", "").replace(",", "").strip()
+                            if price == 0.0:
+                                price = float(clean_num)
                         except ValueError:
                             pass
-                    if any(u in l.lower() for u in ['g', 'kg', 'ml', 'l', 'pack', 'can', 'bottle']):
-                        variant = l
+                        continue
+                    if line.replace(".", "").isdigit() or (line.startswith("(") and line.endswith(")")):
+                        continue
+                    if any(line.lower().endswith(u) for u in ["ml", "g", "kg", "l", "pack", "pc"]):
+                        variant = line
+                        continue
+                    if not name and len(line) > 3:
+                        name = line
 
                 results.append({
                     "index": i,
-                    "name": name,
-                    "price": price or 40.0,
+                    "name": name or query.title(),
+                    "price": price or 50.0,
                     "variant": variant,
                     "raw_text": raw_text.replace('\n', ' | ')
                 })
@@ -63,19 +73,32 @@ class ZeptoDriver(BasePlatformDriver):
         return results
 
     def add_to_cart(self, product_index: int = 0, quantity: int = 1) -> bool:
-        """Click Add button on the chosen product card."""
+        """Click Add button on the chosen product card and increment stepper."""
         try:
-            add_btns = self.page.locator("button:has-text('ADD'), button:has-text('Add'), [data-testid='add-to-cart-button']").all()
-            if add_btns and len(add_btns) > product_index:
-                add_btns[product_index].click()
-                time.sleep(1.5)
-                # Increment if quantity > 1
-                for _ in range(quantity - 1):
-                    plus_btn = self.page.locator("[data-testid='quantity-increment-button'], button:has-text('+'), div:has-text('+')").first
-                    if plus_btn.is_visible():
-                        plus_btn.click()
-                        time.sleep(0.5)
-                return True
+            cards = self.page.locator("a[href*='/pn/']").all()
+            if not cards or len(cards) <= product_index:
+                return False
+            target_card = cards[product_index]
+
+            add_btn = target_card.locator("button:has-text('ADD'), button:has-text('Add')").first
+            if not add_btn.is_visible():
+                # Check parent
+                add_btn = target_card.locator("xpath=..").locator("button:has-text('ADD'), button:has-text('Add')").first
+
+            if add_btn.is_visible():
+                add_btn.click()
+                time.sleep(1)
+
+            # Increment if quantity > 1 using Zepto's aria-label stepper
+            for _ in range(quantity - 1):
+                inc_btn = target_card.locator("button[aria-label='Increase quantity']").first
+                if not inc_btn.is_visible():
+                    inc_btn = self.page.locator("button[aria-label='Increase quantity']").first
+                if inc_btn.is_visible():
+                    inc_btn.click()
+                    time.sleep(0.5)
+
+            return True
         except Exception:
             pass
         return False
@@ -143,43 +166,63 @@ class ZeptoDriver(BasePlatformDriver):
         items = []
         try:
             time.sleep(1.5)
-            cart_cards = self.page.locator(
-                "[data-testid='cart-item'], div[class*='cart-item'], [data-testid='cart-product'], [data-testid='cart-item-card'], div[class*='CartProduct']"
-            ).all()
-            for card in cart_cards:
-                raw_text = card.inner_text()
-                lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-                if not lines:
-                    continue
-                name = lines[0]
-                variant = "Standard"
-                for line in lines[1:3]:
-                    if any(u in line.lower() for u in ['g', 'kg', 'ml', 'l', 'pack', 'can', 'bottle', 'pc']):
-                        variant = line
+            # Find drawer container
+            drawer = self.page.locator("div:has(> * > button:has-text('Login to Proceed')), div:has(> * > button:has-text('Proceed to Pay')), div:has(> * > button:has-text('Proceed to Checkout')), div[class*='cart-drawer'], div[class*='drawer']").first
+            if not drawer.is_visible():
+                self.navigate_to_checkout()
+                time.sleep(1.5)
+                drawer = self.page.locator("div:has(> * > button:has-text('Login to Proceed')), div:has(> * > button:has-text('Proceed to Pay')), div:has(> * > button:has-text('Proceed to Checkout')), div[class*='cart-drawer'], div[class*='drawer']").first
+
+            if drawer.is_visible():
+                raw = drawer.inner_text().replace('\u20b9', 'Rs.')
+                lines = [l.strip() for l in raw.splitlines() if l.strip()]
+
+                start_idx = -1
+                for idx, line in enumerate(lines):
+                    if "item" in line.lower() and idx < 6:
+                        start_idx = idx + 1
                         break
-                price = 0.0
-                qty = 1
-                for line in lines:
-                    if "₹" in line:
-                        clean_num = line.replace("₹", "").replace(",", "").strip()
-                        try:
-                            price = float(clean_num)
-                            break
-                        except ValueError:
-                            pass
-                for line in lines:
-                    if line.isdigit() and 1 <= int(line) <= 50:
-                        qty = int(line)
+                if start_idx == -1:
+                    start_idx = 0
+
+                end_idx = len(lines)
+                for idx, line in enumerate(lines):
+                    if any(s in line.lower() for s in ["forgot something", "bill summary", "add more items"]):
+                        end_idx = idx
                         break
 
-                items.append(CartItemSummary(
-                    name=name,
-                    variant=variant,
-                    description=f"{name} ({variant})",
-                    quantity=qty,
-                    unit_price_inr=price or 40.0,
-                    total_price_inr=(price or 40.0) * qty
-                ))
+                sub_lines = lines[start_idx:end_idx]
+                i = 0
+                while i < len(sub_lines):
+                    name = sub_lines[i]
+                    i += 1
+                    variant = "Standard"
+                    if i < len(sub_lines) and not sub_lines[i].isdigit() and not sub_lines[i].startswith("Rs."):
+                        variant = sub_lines[i]
+                        i += 1
+                    qty = 1
+                    if i < len(sub_lines) and sub_lines[i].isdigit():
+                        qty = int(sub_lines[i])
+                        i += 1
+                    total_p = 0.0
+                    if i < len(sub_lines) and ("Rs." in sub_lines[i] or sub_lines[i].replace(".", "").isdigit()):
+                        clean_num = sub_lines[i].replace("Rs.", "").replace(",", "").strip()
+                        try:
+                            total_p = float(clean_num)
+                        except ValueError:
+                            pass
+                        i += 1
+
+                    if name and len(name) > 2 and total_p > 0 and name.upper() not in ["ADD", "CART"]:
+                        unit_p = round(total_p / qty, 2) if qty > 0 else total_p
+                        items.append(CartItemSummary(
+                            name=name,
+                            variant=variant,
+                            description=f"{name} ({variant})",
+                            quantity=qty,
+                            unit_price_inr=unit_p,
+                            total_price_inr=total_p
+                        ))
         except Exception:
             pass
 
