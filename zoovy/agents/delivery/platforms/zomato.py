@@ -8,8 +8,11 @@ class ZomatoDriver(BasePlatformDriver):
     URL = "https://www.zomato.com"
 
     def navigate_home(self):
-        self.page.goto(self.URL, wait_until="networkidle")
-        time.sleep(1)
+        try:
+            self.page.goto(self.URL, wait_until="domcontentloaded", timeout=20000)
+        except Exception:
+            pass
+        time.sleep(1.5)
 
     def search_product(self, query: str) -> List[Dict[str, Any]]:
         search_input = self.page.locator("input[placeholder*='Search']").first

@@ -8,8 +8,11 @@ class ZeptoDriver(BasePlatformDriver):
     URL = "https://www.zeptonow.com"
 
     def navigate_home(self):
-        self.page.goto(self.URL, wait_until="networkidle")
-        time.sleep(1)
+        try:
+            self.page.goto(self.URL, wait_until="domcontentloaded", timeout=20000)
+        except Exception:
+            pass
+        time.sleep(1.5)
 
     def search_product(self, query: str) -> List[Dict[str, Any]]:
         """Search for items on Zepto."""

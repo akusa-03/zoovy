@@ -8,8 +8,11 @@ class SwiggyDriver(BasePlatformDriver):
     URL = "https://www.swiggy.com"
 
     def navigate_home(self):
-        self.page.goto(self.URL, wait_until="networkidle")
-        time.sleep(1)
+        try:
+            self.page.goto(self.URL, wait_until="domcontentloaded", timeout=20000)
+        except Exception:
+            pass
+        time.sleep(1.5)
 
     def search_product(self, query: str) -> List[Dict[str, Any]]:
         search_link = self.page.locator("a[href*='/search']").first
