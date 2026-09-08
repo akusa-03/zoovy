@@ -73,24 +73,39 @@ Output JSON schema:
             console.print(f"Navigating to {intent.platform.value}...")
             driver.navigate_home()
 
-            # Search & Add Items
+            # 1. Login Verification
+            if not driver.check_login_status():
+                console.print("\n[yellow]⚠️  Not logged in to your account yet.[/yellow]")
+                console.print("[cyan]👉 Please enter your phone number & OTP in the browser window.[/cyan]")
+                input("Press [Enter] here after logging in in the browser to proceed...")
+
+            # 2. Address Selection
+            saved_addresses = driver.get_saved_addresses()
+            selected_address = PaymentGatekeeper.prompt_address_selection(
+                available_addresses=saved_addresses,
+                default_address=intent.address_preference
+            )
+            driver.select_delivery_address(selected_address)
+
+            # 3. Search & Add Items
             for item in intent.items:
                 console.print(f"\n[cyan]🔍 Searching for:[/cyan] '{item.query}'...")
                 results = driver.search_product(item.query)
                 console.print(f"Adding {item.quantity}x '{item.query}' to cart...")
                 driver.add_to_cart(product_index=0, quantity=item.quantity)
 
-            # View Cart & Navigate to Checkout
-            console.print("\n[bold yellow]🛒 Finalizing cart and navigating to checkout...[/bold yellow]")
+            # 4. View Cart & Inspect Live Items
+            console.print("\n[bold yellow]🛒 Finalizing cart and inspecting items...[/bold yellow]")
             driver.navigate_to_checkout()
             cart_items = driver.inspect_cart()
 
-            # Safety Breakpoint: Prompt User
-            subtotal = sum(i.price_inr * i.quantity for i in cart_items)
+            # 5. Safety Breakpoint & Invoice Presentation
+            subtotal = sum(i.total_price_inr for i in cart_items)
             review = OrderCheckoutReview(
                 platform=intent.platform.value,
                 store_name=f"{intent.platform.value.capitalize()} Store",
-                delivery_address=intent.address_preference or "Saved Default Address",
+                delivery_address=selected_address,
+                available_addresses=saved_addresses,
                 items=cart_items,
                 subtotal_inr=subtotal,
                 delivery_fee_inr=25.0,
@@ -99,8 +114,10 @@ Output JSON schema:
 
             confirmed = PaymentGatekeeper.prompt_user_confirmation(review)
             if confirmed:
-                console.print("[bold green]✓ User authorized. Browser remains open for final payment.[/bold green]")
-                input("Press [Enter] after you have completed payment to finish the session...")
+                console.print("\n[bold green]✓ Order authorized by user![/bold green]")
+                console.print("[bold yellow]💳 The browser is currently open on the payment page.[/bold yellow]")
+                console.print("Please complete the payment via UPI/Card in the browser window.")
+                input("\nPress [Enter] after you have completed payment to close the session...")
             else:
                 console.print("[bold red]✗ Order aborted by user. No payment executed.[/bold red]")
 

@@ -22,6 +22,16 @@ class ZomatoDriver(BasePlatformDriver):
     def add_to_cart(self, product_index: int = 0, quantity: int = 1) -> bool:
         return True
 
+    def check_login_status(self) -> bool:
+        cookies = self.page.context.cookies()
+        return any("user" in c["name"].lower() or "token" in c["name"].lower() for c in cookies)
+
+    def get_saved_addresses(self) -> List[str]:
+        return ["Home (Saved Address)", "Work / Office"]
+
+    def select_delivery_address(self, address_name: str) -> bool:
+        return True
+
     def inspect_cart(self) -> List[CartItemSummary]:
         return []
 

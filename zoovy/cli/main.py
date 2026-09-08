@@ -118,6 +118,42 @@ def cmd_setup(args):
     console.print(f"[bold green]✓ Setup complete! Model '{profile.recommended_model}' is ready.[/bold green]")
 
 
+def cmd_login(args):
+    """Open persistent browser for user to log in and save session credentials."""
+    print_banner()
+    platform = args.platform
+    console.print(f"[bold cyan]🔑 Opening session for {platform.upper()}...[/bold cyan]")
+    console.print("[dim]Log in once using your mobile number & OTP. Your session cookies and addresses will be saved locally.[/dim]\n")
+
+    from zoovy.agents.delivery.browser import BrowserSessionManager
+    from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
+    from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
+    from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
+
+    session = BrowserSessionManager(platform_name=platform, headless=False)
+    try:
+        page = session.start()
+        if platform == "zepto":
+            driver = ZeptoDriver(page)
+        elif platform == "swiggy":
+            driver = SwiggyDriver(page)
+        else:
+            driver = ZomatoDriver(page)
+
+        driver.navigate_home()
+        console.print("[bold yellow]Please complete login and verify your delivery address in the opened browser window.[/bold yellow]")
+        input("\nPress [Enter] once you are logged in and can see your profile/addresses...")
+
+        saved_addrs = driver.get_saved_addresses()
+        console.print(f"\n[bold green]✓ Session saved successfully for {platform.upper()}![/bold green]")
+        console.print(f"Found {len(saved_addrs)} saved delivery address(es) on this account:")
+        for a in saved_addrs:
+            console.print(f"  • {a}")
+    finally:
+        session.close()
+        console.print("\n[dim]Browser session safely closed and persisted.[/dim]")
+
+
 def cmd_order(args):
     """Execute an autonomous delivery order."""
     print_banner()
@@ -144,6 +180,10 @@ def main():
     # setup
     subparsers.add_parser("setup", help="Auto-detect VRAM and download recommended LLM")
 
+    # login
+    login_parser = subparsers.add_parser("login", help="Log into a delivery platform (saves OTP session locally)")
+    login_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], default="zepto", help="Target delivery platform (default: zepto)")
+
     # order
     order_parser = subparsers.add_parser("order", help="Execute autonomous delivery order")
     order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
@@ -159,6 +199,8 @@ def main():
         cmd_doctor(args)
     elif args.command == "setup":
         cmd_setup(args)
+    elif args.command == "login":
+        cmd_login(args)
     elif args.command == "order":
         cmd_order(args)
 

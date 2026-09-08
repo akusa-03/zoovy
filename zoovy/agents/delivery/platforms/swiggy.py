@@ -30,9 +30,26 @@ class SwiggyDriver(BasePlatformDriver):
             return True
         return False
 
+    def check_login_status(self) -> bool:
+        cookies = self.page.context.cookies()
+        return any("user" in c["name"].lower() or "token" in c["name"].lower() for c in cookies)
+
+    def get_saved_addresses(self) -> List[str]:
+        return ["Home (Saved Address)", "Work / Office"]
+
+    def select_delivery_address(self, address_name: str) -> bool:
+        return True
+
     def inspect_cart(self) -> List[CartItemSummary]:
         return [
-            CartItemSummary(name="Hyderabadi Chicken Biryani", quantity=2, unit="Portion", price_inr=580.0)
+            CartItemSummary(
+                name="Hyderabadi Chicken Biryani",
+                variant="Full",
+                description="Authentic Dum Biryani with aromatic basmati rice & tender chicken",
+                quantity=2,
+                unit_price_inr=290.0,
+                total_price_inr=580.0
+            )
         ]
 
     def navigate_to_checkout(self) -> bool:

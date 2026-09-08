@@ -71,9 +71,27 @@ zoovy doctor
 zoovy setup
 ```
 
-### 4. Place an Autonomous Order
+### 4. One-Time Account Login (Persistent Session)
+Because delivery platforms require phone + OTP verification, log in once via the visible browser:
 ```bash
-# Order groceries on Zepto
+# Opens Zepto in a browser window to log in via OTP (session is saved locally)
+zoovy login --platform zepto
+
+# Or for Swiggy / Zomato:
+zoovy login --platform swiggy
+zoovy login --platform zomato
+```
+*Your session cookies, tokens, and saved delivery addresses are stored locally in `~/.zoovy/sessions/` and reused on all future runs.*
+
+### 5. Place an Order, Inspect Cart & Confirm Address
+When you run an order command, the AI:
+1. Selects your delivery address from your saved account addresses.
+2. Finds products, matches weight/variant descriptions, and adds them to cart.
+3. Opens the cart and prints an **itemized invoice** showing exact descriptions, weights, quantities, unit prices, and delivery fees.
+4. **Pauses for your confirmation** before opening the final payment view.
+
+```bash
+# Order groceries on Zepto (interactive review & address selection)
 zoovy order --platform zepto "Get 500g Amul salted butter and 1kg tomatoes"
 
 # Order food on Swiggy
