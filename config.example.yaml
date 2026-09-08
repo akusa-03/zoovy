@@ -5,8 +5,8 @@
 llm:
   backend: "ollama"           # Supported: "ollama"
   host: "http://localhost:11434"
-  # Auto-selected by hardware detector if left blank:
-  model: ""                   # e.g., "qwen2.5:14b", "qwen2.5:7b", "qwen2.5:3b"
+  # Default model is lightweight 1.5b (~986MB). Set to enhanced model if desired:
+  model: "qwen2.5:1.5b"       # Optional enhanced: "qwen2.5:14b", "qwen2.5:7b", "qwen2.5:3b"
   temperature: 0.1
   timeout: 120
 

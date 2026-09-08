@@ -26,14 +26,14 @@
 
 ## 📊 VRAM Tier & Model Recommendation Benchmark
 
-Zoovy evaluates local models using the **Berkeley Function Calling Leaderboard (BFCL v4)** to ensure reliable tool-calling and zero hallucination.
+Zoovy provides a lightweight default model (**`qwen2.5:1.5b`**) for fast setup and low resource footprints (~986MB), with an interactive option during `zoovy setup` to upgrade to a hardware-optimized enhanced model based on your GPU VRAM:
 
-| Hardware Tier | Available VRAM | Recommended Model | BFCL v4 Score | Quantization | Tokens/sec | Target Systems |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Enthusiast** | **>= 16 GB** | **`qwen2.5:14b`** | **88.4%** | Q4_K_M (~9.2GB) | ~48 t/s | AMD RX 9070 XT, RTX 4080/4090, Apple M3/M4 Max |
-| **Tier 2: Standard** | **8 GB – 15 GB** | **`qwen2.5:7b`** | **83.1%** | Q4_K_M (~5.2GB) | ~85 t/s | RTX 3060/4060/4070, Apple M-series 16GB |
-| **Tier 3: Entry** | **4 GB – 7 GB** | **`qwen2.5:3b`** | **71.2%** | Q4_K_M (~2.6GB) | ~130 t/s | Budget laptops, GTX 1660, Steam Deck |
-| **Tier 4: CPU Fallback** | **CPU Only** | **`qwen2.5:3b` / `1.5b`** | **64.0%** | Q4_K_M | ~15-25 t/s | Systems without dedicated GPU |
+| Model Role | Model Tag | Required VRAM | BFCL v4 Score | Download Size | Best Suited For |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Default Out-of-the-Box** | **`qwen2.5:1.5b`** | **~1.5 GB** | **64.0%** | **~986 MB** | Instant setup, universal compatibility, CPUs, budget laptops |
+| **Tier 1: Enhanced** | **`qwen2.5:14b`** | **~9.2 GB** | **88.4%** | **~9.0 GB** | Enthusiast GPUs (>= 16GB VRAM: AMD RX 9070 XT, RTX 4080/4090) |
+| **Tier 2: Enhanced** | **`qwen2.5:7b`** | **~5.2 GB** | **83.1%** | **~4.7 GB** | Standard GPUs (8GB - 15GB VRAM: RTX 3060/4060/4070) |
+| **Tier 3: Enhanced** | **`qwen2.5:3b`** | **~2.6 GB** | **71.2%** | **~2.0 GB** | Entry-level GPUs (4GB - 7GB VRAM) |
 
 > **Why Qwen 2.5?** In real-world benchmarks, Qwen 2.5 significantly outperforms Llama 3.1 on Indian grocery taxonomy (e.g., *Amul butter*, *paneer*, *atta*, regional vegetable names) and strict JSON schema adherence.
 

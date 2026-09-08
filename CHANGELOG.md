@@ -16,10 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Planned: Multi-store price comparison across Zepto, Swiggy Instamart, and Blinkit for identical grocery carts.
 
 ### Changed
-- None yet.
-
-### Fixed
-- None yet.
+- Configured **`qwen2.5:1.5b`** as the out-of-the-box default LLM (~986MB, ultra-fast, universal compatibility).
+- Enhanced `zoovy setup` with an interactive model selection prompt allowing users to choose between the lightweight default and the hardware-optimized enhanced model (`qwen2.5:14b` / `7b` / `3b`), defaulting to 1.5B on Enter.
+- Updated `zoovy doctor` to report both Default and Enhanced model readiness statuses.
+- Added `--model` flag to `zoovy setup` for direct non-interactive model downloading.
 
 ---
 

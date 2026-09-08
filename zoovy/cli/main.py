@@ -50,7 +50,8 @@ def cmd_doctor(args):
     hw_table.add_row("System RAM", f"{profile.system_ram_gb:.1f} GB")
     hw_table.add_row("CPU Cores", str(profile.cpu_cores))
     hw_table.add_row("Hardware Tier", profile.tier)
-    hw_table.add_row("Recommended LLM", f"[bold yellow]{profile.recommended_model}[/bold yellow]")
+    hw_table.add_row("Default Model", f"[bold green]{profile.default_model}[/bold green] (Ultra-fast, ~986MB)")
+    hw_table.add_row("Enhanced Model", f"[bold yellow]{profile.enhanced_model}[/bold yellow] (Hardware-Optimized)")
     console.print(hw_table)
 
     console.print(Panel(profile.rationale, title="AI Engine Optimization Rationale", border_style="blue"))
@@ -66,8 +67,10 @@ def cmd_doctor(args):
 
     if ollama_alive:
         installed = ollama.list_installed_models()
-        model_ready = any(profile.recommended_model in m for m in installed)
-        rt_table.add_row(f"Model '{profile.recommended_model}'", "[bold green]INSTALLED[/bold green]" if model_ready else "[bold yellow]NOT PULLED (Run 'zoovy setup')[/bold yellow]")
+        default_ready = any(profile.default_model in m for m in installed)
+        enhanced_ready = any(profile.enhanced_model in m for m in installed)
+        rt_table.add_row(f"Default '{profile.default_model}'", "[bold green]INSTALLED[/bold green]" if default_ready else "[bold yellow]NOT PULLED (Run 'zoovy setup')[/bold yellow]")
+        rt_table.add_row(f"Enhanced '{profile.enhanced_model}'", "[bold green]INSTALLED[/bold green]" if enhanced_ready else "[dim]Optional (Run 'zoovy setup')[/dim]")
 
     from pathlib import Path
     standard_git_paths = [
@@ -85,19 +88,42 @@ def cmd_setup(args):
     """Auto-configure the recommended model and verify dependencies."""
     print_banner()
     profile = get_hardware_profile()
-    console.print(f"[bold]Detected Configuration:[/bold] {profile.tier}")
-    console.print(f"[bold]Optimal Target Model:[/bold] [cyan]{profile.recommended_model}[/cyan]\n")
+    console.print(f"[bold]Detected Hardware:[/bold] {profile.gpu_name} ({profile.vram_gb:.1f} GB VRAM) - {profile.tier}")
 
     ollama = OllamaClient()
     if not ollama.is_alive():
-        console.print("[bold red]Error:[/bold red] Ollama daemon is not running. Please start Ollama first.")
+        console.print("[bold red]Error:[/bold red] Ollama daemon is not running. Please start Ollama first ('ollama serve').")
         sys.exit(1)
 
-    if ollama.is_model_installed(profile.recommended_model):
-        console.print(f"[bold green]✓ Model '{profile.recommended_model}' is already downloaded and ready to run.[/bold green]")
+    # Determine target model
+    target_model = args.model
+    if not target_model:
+        console.print("\n[bold cyan]Choose AI Model Tier to Install:[/bold cyan]")
+        console.print(f"  [bold green][1] {profile.default_model}[/bold green] [bold](Default)[/bold] - Ultra-fast, lightweight (~986 MB), instant setup")
+        console.print(f"  [yellow][2] {profile.enhanced_model}[/yellow] - Enhanced Model (Optimized for your {profile.gpu_name}, {profile.vram_gb:.1f}GB VRAM)")
+        console.print(f"  [white][3] qwen2.5:7b[/white] - Balanced Model (~5.2 GB)")
+        console.print(f"  [white][4] qwen2.5:3b[/white] - Standard Lightweight (~2.6 GB)")
+
+        try:
+            choice = input(f"\nSelect model [1-4, Default: 1 ({profile.default_model})]: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            choice = "1"
+
+        if choice == "2":
+            target_model = profile.enhanced_model
+        elif choice == "3":
+            target_model = "qwen2.5:7b"
+        elif choice == "4":
+            target_model = "qwen2.5:3b"
+        else:
+            target_model = profile.default_model
+
+    console.print(f"\n[green]✓ Selected Model:[/green] [bold cyan]{target_model}[/bold cyan]\n")
+    if ollama.is_model_installed(target_model):
+        console.print(f"[bold green]✓ Model '{target_model}' is already downloaded and ready to run.[/bold green]")
         return
 
-    console.print(f"Pulling model [bold cyan]{profile.recommended_model}[/bold cyan] from Ollama registry...")
+    console.print(f"Pulling model [bold cyan]{target_model}[/bold cyan] from Ollama registry...")
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -105,8 +131,8 @@ def cmd_setup(args):
         DownloadColumn(),
         console=console
     ) as progress:
-        task = progress.add_task(f"Downloading {profile.recommended_model}...", total=None)
-        for update in ollama.pull_model(profile.recommended_model):
+        task = progress.add_task(f"Downloading {target_model}...", total=None)
+        for update in ollama.pull_model(target_model):
             status = update.get("status", "")
             completed = update.get("completed", 0)
             total = update.get("total", 0)
@@ -115,7 +141,7 @@ def cmd_setup(args):
             else:
                 progress.update(task, description=status)
 
-    console.print(f"[bold green]✓ Setup complete! Model '{profile.recommended_model}' is ready.[/bold green]")
+    console.print(f"[bold green]✓ Setup complete! Model '{target_model}' is ready.[/bold green]")
 
 
 def cmd_login(args):
@@ -163,7 +189,7 @@ def cmd_order(args):
         sys.exit(1)
 
     profile = get_hardware_profile()
-    model = args.model or profile.recommended_model
+    model = args.model or profile.default_model
     ollama.model = model
 
     agent = DeliveryAgent(llm_client=ollama)
@@ -178,7 +204,8 @@ def main():
     subparsers.add_parser("doctor", help="Check system hardware, VRAM, and runtime health")
 
     # setup
-    subparsers.add_parser("setup", help="Auto-detect VRAM and download recommended LLM")
+    setup_parser = subparsers.add_parser("setup", help="Auto-detect VRAM and download recommended LLM")
+    setup_parser.add_argument("--model", type=str, help="Specify model tag to pull directly (e.g. 'qwen2.5:1.5b', 'qwen2.5:14b')")
 
     # login
     login_parser = subparsers.add_parser("login", help="Log into a delivery platform (saves OTP session locally)")

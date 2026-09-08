@@ -14,6 +14,8 @@ class HardwareProfile:
     system_ram_gb: float
     cpu_cores: int
     tier: str
+    default_model: str
+    enhanced_model: str
     recommended_model: str
     context_window: int
     rationale: str
@@ -114,38 +116,40 @@ def get_hardware_profile() -> HardwareProfile:
     elif platform.system() == "Windows":
         gpu_name, vram_gb = detect_vram_windows()
 
-    # Determine Tier & Recommendation
+    default_model = "qwen2.5:1.5b"
+
+    # Determine Tier & Enhanced Recommendation
     if vram_gb >= 14.0:
         tier = "Tier 1: High VRAM (Enthusiast)"
-        recommended_model = "qwen2.5:14b"
+        enhanced_model = "qwen2.5:14b"
         context_window = 32768
         rationale = (
-            f"Detected {vram_gb:.1f}GB VRAM on {gpu_name}. Qwen 2.5 14B fits comfortably "
-            "with full 32k context and delivers state-of-the-art agentic tool calling (88.4% BFCL v4)."
+            f"Detected {vram_gb:.1f}GB VRAM on {gpu_name}. Default is '{default_model}' (ultra-fast, ~986MB). "
+            f"Your system can effortlessly run the enhanced '{enhanced_model}' for state-of-the-art agentic tool calling."
         )
     elif vram_gb >= 7.0:
         tier = "Tier 2: Standard VRAM"
-        recommended_model = "qwen2.5:7b"
+        enhanced_model = "qwen2.5:7b"
         context_window = 16384
         rationale = (
-            f"Detected {vram_gb:.1f}GB VRAM on {gpu_name}. Qwen 2.5 7B provides lightning-fast "
-            "inference (~85 t/s) with robust structured JSON adherence."
+            f"Detected {vram_gb:.1f}GB VRAM on {gpu_name}. Default is '{default_model}'. "
+            f"Enhanced '{enhanced_model}' (~5.2GB) is also recommended for higher structured reasoning."
         )
     elif vram_gb >= 3.0:
         tier = "Tier 3: Low VRAM"
-        recommended_model = "qwen2.5:3b"
+        enhanced_model = "qwen2.5:3b"
         context_window = 8192
         rationale = (
-            f"Detected {vram_gb:.1f}GB VRAM. Qwen 2.5 3B is ultra-lightweight (~2.6GB) and "
-            "runs smoothly with low resource overhead."
+            f"Detected {vram_gb:.1f}GB VRAM. Default is '{default_model}' (~986MB). "
+            f"Enhanced '{enhanced_model}' (~2.6GB) fits comfortably in memory."
         )
     else:
         tier = "Tier 4: CPU Fallback"
-        recommended_model = "qwen2.5:3b"
+        enhanced_model = "qwen2.5:3b"
         context_window = 4096
         rationale = (
             f"No dedicated high-memory GPU found. Utilizing {system_ram_gb}GB system RAM and "
-            f"{cpu_cores} CPU cores with Qwen 2.5 3B."
+            f"{cpu_cores} CPU cores with '{default_model}'."
         )
 
     return HardwareProfile(
@@ -154,7 +158,9 @@ def get_hardware_profile() -> HardwareProfile:
         system_ram_gb=system_ram_gb,
         cpu_cores=cpu_cores,
         tier=tier,
-        recommended_model=recommended_model,
+        default_model=default_model,
+        enhanced_model=enhanced_model,
+        recommended_model=default_model,
         context_window=context_window,
         rationale=rationale
     )

@@ -9,7 +9,7 @@ class OllamaClient:
     structured JSON tool-calling and streaming model downloads.
     """
 
-    def __init__(self, host: str = "http://localhost:11434", model: str = "qwen2.5:14b"):
+    def __init__(self, host: str = "http://localhost:11434", model: str = "qwen2.5:1.5b"):
         self.host = host.rstrip("/")
         self.model = model
 
