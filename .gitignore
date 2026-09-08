@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Browser sessions, cookies, tokens (SENSITIVE)
+.zoovy/
+browser_data/
+sessions/
+*.session
+
+# Secrets & Config overrides
+.env
+.env.local
+config.yaml
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

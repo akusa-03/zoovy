@@ -1,0 +1,35 @@
+# Zoovy Configuration Template
+# Copy to config.yaml to customize
+
+# LLM Backend Configuration
+llm:
+  backend: "ollama"           # Supported: "ollama"
+  host: "http://localhost:11434"
+  # Auto-selected by hardware detector if left blank:
+  model: ""                   # e.g., "qwen2.5:14b", "qwen2.5:7b", "qwen2.5:3b"
+  temperature: 0.1
+  timeout: 120
+
+# Browser Automation Configuration
+browser:
+  headless: false             # Set false so you can watch the agent operate
+  slow_mo_ms: 100             # Slow down interactions slightly for stability
+  user_data_dir: "~/.zoovy/browser_data"
+  timeout_seconds: 30
+
+# Delivery Platforms Configuration
+platforms:
+  zepto:
+    enabled: true
+    base_url: "https://www.zeptonow.com"
+  swiggy:
+    enabled: true
+    base_url: "https://www.swiggy.com"
+  zomato:
+    enabled: true
+    base_url: "https://www.zomato.com"
+
+# Safety & Checkout Guardrails
+safety:
+  require_payment_confirmation: true   # Always pause before final payment
+  max_cart_budget_inr: 5000            # Safety spend limit
