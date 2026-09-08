@@ -3,6 +3,56 @@ import requests
 from typing import Dict, Any, List, Optional, Generator
 
 
+def ensure_ollama_running(host: str = "http://localhost:11434") -> bool:
+    """
+    Checks if Ollama is running. If not, automatically launches the daemon
+    in the background as a detached process and waits for it to become ready.
+    """
+    import subprocess
+    import shutil
+    import time
+    from pathlib import Path
+
+    client = OllamaClient(host=host)
+    if client.is_alive():
+        return True
+
+    ollama_exe = shutil.which("ollama")
+    if not ollama_exe:
+        possible_paths = [
+            Path.home() / "AppData/Local/Programs/Ollama/ollama.exe",
+            Path(r"C:\Program Files\Ollama\ollama.exe"),
+        ]
+        for p in possible_paths:
+            if p.exists():
+                ollama_exe = str(p)
+                break
+
+    if not ollama_exe:
+        return False
+
+    creationflags = 0
+    import sys
+    if sys.platform == "win32":
+        creationflags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+
+    try:
+        subprocess.Popen(
+            [ollama_exe, "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags
+        )
+        for _ in range(15):
+            time.sleep(0.4)
+            if client.is_alive():
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
 class OllamaClient:
     """
     Interface for interacting with local Ollama instance with support for

@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn
 
 from zoovy.core.hardware import get_hardware_profile
-from zoovy.core.llm import OllamaClient
+from zoovy.core.llm import OllamaClient, ensure_ollama_running
 from zoovy.agents.delivery.agent import DeliveryAgent
 
 console = Console(highlight=False)
@@ -62,7 +62,7 @@ def cmd_doctor(args):
     rt_table.add_column("Status", style="white")
 
     ollama = OllamaClient()
-    ollama_alive = ollama.is_alive()
+    ollama_alive = ensure_ollama_running()
     rt_table.add_row("Ollama Daemon", "[bold green]ONLINE (http://localhost:11434)[/bold green]" if ollama_alive else "[bold red]OFFLINE (Start via 'ollama serve')[/bold red]")
 
     if ollama_alive:
@@ -91,8 +91,8 @@ def cmd_setup(args):
     console.print(f"[bold]Detected Hardware:[/bold] {profile.gpu_name} ({profile.vram_gb:.1f} GB VRAM) - {profile.tier}")
 
     ollama = OllamaClient()
-    if not ollama.is_alive():
-        console.print("[bold red]Error:[/bold red] Ollama daemon is not running. Please start Ollama first ('ollama serve').")
+    if not ensure_ollama_running():
+        console.print("[bold red]Error:[/bold red] Ollama daemon could not be reached or started. Please install Ollama from https://ollama.com.")
         sys.exit(1)
 
     # Determine target model
@@ -184,8 +184,8 @@ def cmd_order(args):
     """Execute an autonomous delivery order."""
     print_banner()
     ollama = OllamaClient()
-    if not ollama.is_alive():
-        console.print("[bold red]Error:[/bold red] Ollama daemon is not reachable. Start Ollama and try again.")
+    if not ensure_ollama_running():
+        console.print("[bold red]Error:[/bold red] Ollama daemon could not be reached or started. Please install Ollama from https://ollama.com.")
         sys.exit(1)
 
     profile = get_hardware_profile()
