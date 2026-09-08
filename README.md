@@ -4,6 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://python.org)
 [![Engine: Ollama](https://img.shields.io/badge/Engine-Ollama%20Local-purple.svg)](https://ollama.com)
 [![Browser: Playwright](https://img.shields.io/badge/Browser-Playwright-red.svg)](https://playwright.dev)
+[![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-orange.svg)](CHANGELOG.md)
 
 **Zoovy** is an open-source, fully local AI agent framework designed to automate real-world daily tasks. Its flagship module, **`delivery-agent`**, autonomously navigates delivery platforms (**Zepto**, **Swiggy**, and **Zomato**), searches products, builds carts, resolves item variants, and navigates to the checkout counter—with a built-in **Human-in-the-Loop (HITL) payment firewall**.
 
