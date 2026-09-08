@@ -46,24 +46,47 @@ Zoovy provides a lightweight default model (**`qwen2.5:1.5b`**) for fast setup a
 - **Git**
 - **Ollama:** [Download & Install Ollama](https://ollama.com/download)
 
-### 2. Clone & Install
+### 2. Clone the Repository
 ```bash
 git clone https://github.com/akusa-03/zoovy.git
 cd zoovy
+```
 
-# Create virtual environment
+### 3. Run Setup (Automated or Manual)
+
+#### Option A: One-Click Setup Script (Recommended)
+- **On Windows (PowerShell):**
+  ```powershell
+  .\setup.ps1
+  ```
+  *(Or simply double-click `setup.bat`)*
+- **On Linux / macOS:**
+  ```bash
+  chmod +x setup.sh && ./setup.sh
+  ```
+
+#### Option B: Manual Step-by-Step
+
+**Windows (PowerShell):**
+```powershell
+# Enable script execution if restricted:
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+
 python -m venv .venv
-# On Windows:
-.venv\Scripts\activate
-# On Linux/macOS:
-source .venv/bin/activate
-
-# Install dependencies
+.\.venv\Scripts\Activate.ps1
 pip install -e .
 playwright install chromium
 ```
 
-### 3. Run Hardware Diagnostic & Setup
+**macOS / Linux (Bash or Zsh):**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+playwright install chromium
+```
+
+### 4. Run Hardware Diagnostic & Setup
 ```bash
 # Check system readiness and get your hardware tier recommendation
 zoovy doctor
@@ -72,7 +95,7 @@ zoovy doctor
 zoovy setup
 ```
 
-### 4. One-Time Account Login (Persistent Session)
+### 5. One-Time Account Login (Persistent Session)
 Because delivery platforms require phone + OTP verification, log in once via the visible browser:
 ```bash
 # Opens Zepto in a browser window to log in via OTP (session is saved locally)
@@ -84,7 +107,7 @@ zoovy login --platform zomato
 ```
 *Your session cookies, tokens, and saved delivery addresses are stored locally in `~/.zoovy/sessions/` and reused on all future runs.*
 
-### 5. Place an Order, Inspect Cart & Confirm Address
+### 6. Place an Order, Inspect Cart & Confirm Address
 When you run an order command, the AI:
 1. Selects your delivery address from your saved account addresses.
 2. Finds products, matches weight/variant descriptions, and adds them to cart.
