@@ -271,8 +271,8 @@ def cmd_metadata(args):
         tag = getattr(args, "tag", None) or "Home"
         agent.ask_and_store_address(tag=tag)
     elif action == "sync":
-        meta = agent.load_metadata()
-        console.print(f"[bold green]✓ Synced {len(meta.get('addresses', {}))} address(es) from {agent.metadata_file}[/bold green]")
+        chosen = agent.prompt_swiggy_oauth_and_select_address()
+        console.print(f"[bold green]✓ Swiggy OAuth address synced & active:[/bold green] {chosen.get('formatted')}")
 
 
 def cmd_address(args):

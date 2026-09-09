@@ -63,19 +63,23 @@ Respond with a JSON object:
         prompt: str,
         web_context: Optional[str] = None,
         address_override: Optional[str] = None,
-        items_override: Optional[List[Dict[str, Any]]] = None
+        items_override: Optional[List[Dict[str, Any]]] = None,
+        selected_address: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Executes end-to-end Instamart grocery ordering:
-        1. Verifies delivery address (prompts if missing)
+        1. Always asks for Swiggy OAuth and fetches cloud addresses for user selection
         2. Discovers items via Swiggy Instamart MCP
         3. Adds items to cart (ADD TO CART ONLY)
         4. Halts for human confirmation before placing order
         """
         console.print(f"\n[bold cyan]🛒 [Swiggy Instamart Agent][/bold cyan] Processing grocery order: [bold]'{prompt}'[/bold]")
 
-        # 1. Address Resolution
-        addr_record = self.metadata_agent.resolve_or_prompt_address(preferred_tag=address_override)
+        # 1. Address Resolution via Swiggy OAuth
+        if selected_address:
+            addr_record = selected_address
+        else:
+            addr_record = self.metadata_agent.resolve_or_prompt_address(preferred_tag=address_override, force_oauth=True)
         delivery_address = addr_record.get("formatted", "Bengaluru - 560066")
 
         # 2. Parse Intent with Web Context or use items_override from Goal Contract

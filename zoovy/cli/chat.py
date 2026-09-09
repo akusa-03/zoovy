@@ -111,6 +111,7 @@ class InteractiveChatSession:
         table.add_row("/metadata", "Inspect Swiggy metadata JSON file")
         table.add_row("/cart", "View current items in your delivery cart")
         table.add_row("/doctor", "Run system hardware and runtime health check")
+        table.add_row("/oauth", "Authenticate Swiggy OAuth & sync cloud addresses")
         table.add_row("/model [name]", "View or switch active local Ollama model")
         table.add_row("/clear", "Clear screen and redisplay status header")
         table.add_row("exit / quit", "Exit the interactive chat box")
@@ -195,8 +196,10 @@ class InteractiveChatSession:
             }
             self.metadata_agent.save_metadata(meta)
             console.print(f"[bold green]✓ Saved address under '[cyan]{tag}[/cyan]':[/bold green] {addr}")
+        elif sub_args in ["sync", "oauth"]:
+            self.metadata_agent.prompt_swiggy_oauth_and_select_address()
         else:
-            console.print("[yellow]Usage: /address [list | add <Tag> <Full Address>][/yellow]")
+            console.print("[yellow]Usage: /address [list | sync | oauth | add <Tag> <Full Address>][/yellow]")
 
     def handle_conversational_query(self, user_msg: str):
         """Responds conversationally using local LLM with web search context."""
@@ -255,6 +258,9 @@ class InteractiveChatSession:
                 continue
             elif cmd_lower in ["/metadata", "metadata"]:
                 self.metadata_agent.display_metadata_summary()
+                continue
+            elif cmd_lower in ["/oauth", "oauth"]:
+                self.metadata_agent.prompt_swiggy_oauth_and_select_address()
                 continue
             elif cmd_lower in ["/clear", "clear"]:
                 os.system("clear" if os.name != "nt" else "cls")

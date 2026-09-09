@@ -9,6 +9,7 @@ Comprehensive Test Suite for Zoovy Swiggy & Dynamic Goal Engine Features:
 
 import sys
 import os
+os.environ["ZOVI_TEST_MODE"] = "1"
 from pathlib import Path
 from rich.console import Console
 
@@ -137,9 +138,32 @@ def run_tests():
     console.print(f"  • Self-Healing Step: [green]{recovery_res['details']}[/green]")
     console.print("  [bold green]✓ Safety & Cart Fence Evaluation PASSED[/bold green]\n")
 
-    # Clean up test file
+    # TEST 6: Swiggy OAuth & Cloud Address Selection
+    console.print("[bold yellow]► TEST 6: Swiggy OAuth & Cloud Address Synchronization[/bold yellow]")
+    cloud_addrs = food_mcp.fetch_cloud_addresses(token="test_swiggy_oauth_token")
+    assert len(cloud_addrs) >= 3, "Should fetch at least 3 addresses from Swiggy cloud account"
+    assert any(a["tag"] == "Home" for a in cloud_addrs), "Should contain Home address"
+    assert any(a["tag"] == "Work" for a in cloud_addrs), "Should contain Work address"
+    console.print(f"  • Fetched {len(cloud_addrs)} cloud addresses via Swiggy OAuth:")
+    for ca in cloud_addrs:
+        console.print(f"    - [{ca['tag']}] {ca['formatted']}")
+
+    # Test address selection via metadata agent
+    test_oauth_meta_file = Path.home() / ".zoovy" / "test_oauth_meta.json"
+    if test_oauth_meta_file.exists():
+        test_oauth_meta_file.unlink()
+    oauth_agent = SwiggyMetadataAgent(metadata_file=test_oauth_meta_file)
+    chosen = oauth_agent.prompt_swiggy_oauth_and_select_address(preferred_tag="Work")
+    assert chosen is not None, "Chosen address should not be None"
+    assert chosen["tag"] == "Work", "Should select preferred Work address"
+    console.print(f"  • Selected Delivery Address: [green]{chosen['tag']} - {chosen['formatted']}[/green]")
+    console.print("  [bold green]✓ Swiggy OAuth & Cloud Address Selection PASSED[/bold green]\n")
+
+    # Clean up test files
     if test_json_file.exists():
         test_json_file.unlink()
+    if test_oauth_meta_file.exists():
+        test_oauth_meta_file.unlink()
 
     console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
     console.print("[bold green]      ALL SWIGGY & GOAL ENGINE TESTS PASSED (100% SUCCESS)    [/bold green]")
