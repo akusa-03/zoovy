@@ -203,13 +203,21 @@ class SwiggyMetadataAgent:
             except Exception:
                 pass
 
+        # If existing token is missing or dummy, auto-check browser
+        if not existing_token or not existing_token.startswith("eyJ"):
+            if not os.environ.get("ZOVI_TEST_MODE") and not os.environ.get("PYTEST_CURRENT_TEST"):
+                from zoovy.core.oauth import BrowserTokenExtractor
+                b_tokens = BrowserTokenExtractor.extract_swiggy_tokens()
+                if b_tokens.get("swiggy-mcp-token"):
+                    existing_token = b_tokens["swiggy-mcp-token"]
+
         if is_interactive:
             if existing_token:
-                masked = existing_token[:6] + "..." + existing_token[-4:] if len(existing_token) > 12 else existing_token
+                masked = existing_token[:8] + "..." + existing_token[-6:] if len(existing_token) > 16 else existing_token
                 console.print()
                 console.print(Panel(
                     f"[bold cyan]🔑 Swiggy Account Link Detected[/bold cyan]\n\n"
-                    f"Found active Swiggy session: [bold green]{masked}[/bold green]\n\n"
+                    f"Found active Swiggy session token: [bold green]{masked}[/bold green]\n\n"
                     f"  [bold cyan][1][/bold cyan] Continue with active session (Instant)\n"
                     f"  [bold yellow][2][/bold yellow] Open browser for OAuth 2.0 login & link new session",
                     title="🔐 Swiggy OAuth 2.0 Gate",
@@ -254,38 +262,56 @@ class SwiggyMetadataAgent:
             meta["addresses"] = {}
 
         for c_addr in cloud_addresses:
-            tag = c_addr.get("tag", "Home")
-            meta["addresses"][tag] = c_addr
+            addr_key = c_addr.get("id") or c_addr.get("tag", "Home")
+            meta["addresses"][addr_key] = c_addr
 
+        meta["cloud_addresses"] = cloud_addresses
         self.save_metadata(meta)
 
-        # Now ask the user to choose their delivery address
-        addr_list = list(meta["addresses"].values())
+        # Address selection list
+        addr_list = cloud_addresses if cloud_addresses else list(meta["addresses"].values())
 
-        table = Table(title="📍 Select Swiggy Delivery Address", expand=True)
-        table.add_column("#", style="bold yellow", width=4, justify="center")
-        table.add_column("Tag / Label", style="bold cyan", width=14)
-        table.add_column("Delivery Address", style="white")
-        table.add_column("Pincode", style="green", width=10)
+        def _render_table(show_all: bool = False):
+            display_items = addr_list if show_all or len(addr_list) <= 10 else addr_list[:10]
+            table = Table(title="📍 Select Swiggy Delivery Address", expand=True)
+            table.add_column("#", style="bold yellow", width=4, justify="center")
+            table.add_column("Tag / Category", style="bold cyan", width=18)
+            table.add_column("Delivery Address", style="white")
+            table.add_column("Pincode", style="green", width=10)
 
-        def_idx = 1
-        for idx, addr_obj in enumerate(addr_list, 1):
-            is_def = ""
-            if preferred_tag and preferred_tag.lower() in addr_obj.get("tag", "").lower():
-                is_def = " [bold green](Preferred)[/bold green]"
-                def_idx = idx
-            elif idx == 1 and not preferred_tag:
-                is_def = " [bold green](Default)[/bold green]"
-            table.add_row(str(idx), f"{addr_obj.get('tag')}{is_def}", addr_obj.get("formatted", ""), addr_obj.get("pincode", ""))
+            for idx, addr_obj in enumerate(display_items, 1):
+                is_def = ""
+                tag_name = addr_obj.get("tag") or addr_obj.get("category", "Saved")
+                if preferred_tag and (preferred_tag.lower() in tag_name.lower() or preferred_tag.lower() in addr_obj.get("category", "").lower()):
+                    is_def = " [bold green](Preferred)[/bold green]"
+                elif idx == 1 and not preferred_tag:
+                    is_def = " [bold green](Default)[/bold green]"
+                table.add_row(str(idx), f"{tag_name}{is_def}", addr_obj.get("formatted", ""), addr_obj.get("pincode", ""))
 
-        table.add_row("+", "Add Custom", "Enter a new delivery address manually", "-")
+            if not show_all and len(addr_list) > 10:
+                table.add_row("m", "More...", f"Show all {len(addr_list)} saved addresses", "-")
+            table.add_row("+", "Add Custom", "Enter a new delivery address manually", "-")
+            return table
+
         console.print()
-        console.print(table)
+        console.print(_render_table(show_all=False))
 
         chosen_address = None
+        def_idx = 1
+        if preferred_tag:
+            for idx, addr_obj in enumerate(addr_list, 1):
+                tag_name = addr_obj.get("tag") or addr_obj.get("category", "")
+                if preferred_tag.lower() in tag_name.lower() or preferred_tag.lower() in addr_obj.get("category", "").lower():
+                    def_idx = idx
+                    break
+
         if is_interactive:
             try:
-                choice = input(f"\nSelect delivery address [1-{len(addr_list)}, or + to add new] (Default: {def_idx}): ").strip()
+                choice = input(f"\nSelect delivery address [1-{len(addr_list)}, m for all, or + to add new] (Default: {def_idx}): ").strip()
+                if choice.lower() in ["m", "more"]:
+                    console.print()
+                    console.print(_render_table(show_all=True))
+                    choice = input(f"\nSelect delivery address [1-{len(addr_list)}, or + to add new] (Default: {def_idx}): ").strip()
                 if choice == "+":
                     return self.ask_and_store_address()
                 elif choice.isdigit():
@@ -298,11 +324,13 @@ class SwiggyMetadataAgent:
         if not chosen_address:
             chosen_address = addr_list[def_idx - 1] if addr_list else {
                 "tag": "Home",
-                "formatted": "Flat 402, Sunshine Apts, Whitefield, Bengaluru - 560066",
+                "formatted": "Bengaluru - 560066",
                 "pincode": "560066"
             }
 
         meta["default_tag"] = chosen_address.get("tag", "Home")
+        meta["default_address_id"] = chosen_address.get("id")
+        meta["default_address"] = chosen_address
         self.save_metadata(meta)
 
         console.print(f"[bold green]✓ Active Swiggy Delivery Address Selected:[/bold green] [cyan]{chosen_address.get('tag')}[/cyan] - {chosen_address.get('formatted')}\n")

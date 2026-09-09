@@ -101,7 +101,7 @@ Respond with a JSON object:
             qty = int(item_req.get("quantity", 1))
             preferred_var = item_req.get("variant", "Standard")
 
-            products = self.mcp.search_items(query=q)
+            products = self.mcp.search_items(query=q, address_id=addr_record.get("id"))
             prod = products[0] if products else {
                 "product_id": f"im_{abs(hash(q)) % 1000}",
                 "name": q.title(),

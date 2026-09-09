@@ -25,10 +25,18 @@ from zoovy.core.safety import CartItemSummary
 console = Console(highlight=False)
 
 def run_tests():
+    # Preserve real user tokens
+    token_dir = Path.home() / ".zoovy" / "tokens"
+    token_backups = {}
+    if token_dir.exists():
+        for tf in token_dir.glob("*.json"):
+            try:
+                token_backups[tf.name] = tf.read_text(encoding="utf-8")
+            except Exception:
+                pass
+
     console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
     console.print("[bold cyan]       SWIGGY MCP & GOAL ENGINE SYSTEM VERIFICATION            [/bold cyan]")
-    console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]\n")
-
     # TEST 1: Web Search on Query
     console.print("[bold yellow]► TEST 1: Live Web Search Context Retrieval[/bold yellow]")
     res = WebSearchEngine.enrich_query_context("4 cans of diet coke 300ml")
@@ -193,11 +201,18 @@ def run_tests():
         server.shutdown()
         server.server_close()
 
-    # Clean up test files
-    if test_json_file.exists():
-        test_json_file.unlink()
-    if test_oauth_meta_file.exists():
-        test_oauth_meta_file.unlink()
+        # Clean up test files
+        if test_json_file.exists():
+            test_json_file.unlink()
+        if test_oauth_meta_file.exists():
+            test_oauth_meta_file.unlink()
+
+        # Restore original user tokens
+        for fname, content in token_backups.items():
+            try:
+                (token_dir / fname).write_text(content, encoding="utf-8")
+            except Exception:
+                pass
 
     console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
     console.print("[bold green]      ALL SWIGGY & GOAL ENGINE TESTS PASSED (100% SUCCESS)    [/bold green]")

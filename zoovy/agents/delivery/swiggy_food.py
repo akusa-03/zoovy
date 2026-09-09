@@ -98,6 +98,7 @@ Respond with a JSON object:
         # 3. Discover Restaurants via MCP
         restaurants = self.mcp.search_restaurants(
             query=rest_query,
+            address_id=addr_record.get("id"),
             latitude=addr_record.get("latitude", 12.9716),
             longitude=addr_record.get("longitude", 77.5946)
         )
@@ -117,7 +118,11 @@ Respond with a JSON object:
             name = item_req.get("name") or item_req.get("query") or "Dish"
             qty = int(item_req.get("quantity", 1))
 
-            dishes = self.mcp.search_dishes(query=name, restaurant_id=selected_rest.get("restaurant_id"))
+            dishes = self.mcp.search_dishes(
+                query=name,
+                restaurant_id=selected_rest.get("restaurant_id"),
+                address_id=addr_record.get("id")
+            )
             dish = dishes[0] if dishes else {
                 "dish_id": f"dish_{abs(hash(name)) % 1000}",
                 "name": name.title(),
