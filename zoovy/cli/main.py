@@ -203,7 +203,19 @@ def cmd_login(args):
             console.print("\n[dim]Browser session safely closed and persisted.[/dim]")
         return
 
-    # Zero-Browser MCP Mode Login (Default)
+    # Swiggy OAuth 2.0 Browser Mode (Default for Swiggy)
+    if platform == "swiggy" and not args.token and not args.browser:
+        from zoovy.core.oauth import SwiggyOAuthManager
+        from zoovy.agents.delivery.swiggy_metadata import SwiggyMetadataAgent
+        oauth_res = SwiggyOAuthManager.authorize_via_browser()
+        token = oauth_res.get("access_token")
+        meta_agent = SwiggyMetadataAgent()
+        chosen = meta_agent.prompt_swiggy_oauth_and_select_address(preferred_tag="Home")
+        console.print(f"\n[bold green]✓ Swiggy OAuth 2.0 Browser login complete![/bold green]")
+        console.print(f"  • Active Delivery Address: [cyan]{chosen.get('tag')}[/cyan] - {chosen.get('formatted')}\n")
+        return
+
+    # Zero-Browser MCP Mode Login (Fallback/Manual Token)
     token_input = args.token
     if not token_input:
         console.print("[bold]⚡ Zero-Browser MCP Account Link[/bold]")

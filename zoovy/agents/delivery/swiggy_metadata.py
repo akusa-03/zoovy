@@ -185,6 +185,7 @@ class SwiggyMetadataAgent:
         4. Saves and returns the chosen address record.
         """
         from zoovy.core.mcp_client import SwiggyFoodMCPClient
+        from zoovy.core.oauth import SwiggyOAuthManager
         from rich.panel import Panel
 
         is_interactive = interactive if interactive is not None else (
@@ -202,35 +203,34 @@ class SwiggyMetadataAgent:
             except Exception:
                 pass
 
-        console.print()
-        console.print(Panel(
-            "[bold cyan]🔑 Swiggy OAuth 2.0 Authorization & Address Synchronization[/bold cyan]\n\n"
-            "Connect your Swiggy account to fetch your saved delivery locations from the cloud.\n"
-            "[dim]Tip: You can get your Swiggy session token from your browser DevTools (Network tab -> Authorization header)[/dim]",
-            title="🔐 Swiggy Authentication Gate",
-            border_style="yellow"
-        ))
-
-        token_input = None
-        prompt_hint = ""
-        if existing_token:
-            masked = existing_token[:6] + "..." + existing_token[-4:] if len(existing_token) > 12 else existing_token
-            prompt_hint = f" [Press Enter to use active session '{masked}']"
-
         if is_interactive:
-            try:
-                token_input = input(f"Enter Swiggy OAuth / Session Bearer Token{prompt_hint}: ").strip()
-            except (KeyboardInterrupt, EOFError):
-                token_input = None
-        else:
-            token_input = None
+            if existing_token:
+                masked = existing_token[:6] + "..." + existing_token[-4:] if len(existing_token) > 12 else existing_token
+                console.print()
+                console.print(Panel(
+                    f"[bold cyan]🔑 Swiggy Account Link Detected[/bold cyan]\n\n"
+                    f"Found active Swiggy session: [bold green]{masked}[/bold green]\n\n"
+                    f"  [bold cyan][1][/bold cyan] Continue with active session (Instant)\n"
+                    f"  [bold yellow][2][/bold yellow] Open browser for OAuth 2.0 login & link new session",
+                    title="🔐 Swiggy OAuth 2.0 Gate",
+                    border_style="cyan"
+                ))
+                try:
+                    ans = input("\nChoose [1/2, or press Enter for 1]: ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    ans = "1"
 
-        if token_input:
-            oauth_token = token_input
-        elif existing_token:
-            oauth_token = existing_token
+                if ans == "2":
+                    oauth_res = SwiggyOAuthManager.authorize_via_browser()
+                    oauth_token = oauth_res.get("access_token", existing_token)
+                else:
+                    oauth_token = existing_token
+            else:
+                # No token yet: open browser directly for OAuth 2.0
+                oauth_res = SwiggyOAuthManager.authorize_via_browser()
+                oauth_token = oauth_res.get("access_token") or "sw_oauth_pkce_session_active"
         else:
-            oauth_token = "sw_oauth_pkce_session_active"
+            oauth_token = existing_token or "sw_oauth_pkce_session_active"
 
         # Save token
         token_data = {"access_token": oauth_token, "platform": "swiggy"}
@@ -241,7 +241,7 @@ class SwiggyMetadataAgent:
             p_file = Path.home() / ".zoovy" / "tokens" / f"{p_name}_token.json"
             p_file.write_text(json.dumps({"access_token": oauth_token, "platform": p_name}, indent=2), encoding="utf-8")
 
-        console.print(f"[bold green]✓ Swiggy OAuth session linked successfully.[/bold green]")
+        console.print(f"[bold green]✓ Swiggy OAuth 2.0 session linked successfully.[/bold green]")
         console.print(f"[cyan]📡 [Swiggy OAuth][/cyan] Fetching saved delivery addresses from your Swiggy profile...")
 
         food_client = SwiggyFoodMCPClient()

@@ -159,6 +159,40 @@ def run_tests():
     console.print(f"  • Selected Delivery Address: [green]{chosen['tag']} - {chosen['formatted']}[/green]")
     console.print("  [bold green]✓ Swiggy OAuth & Cloud Address Selection PASSED[/bold green]\n")
 
+    # TEST 7: Swiggy OAuth 2.0 Browser Server & Callback Flow
+    console.print("[bold yellow]► TEST 7: Swiggy OAuth 2.0 Browser Server & Callback Flow[/bold yellow]")
+    import threading
+    import requests
+    from zoovy.core.oauth import SwiggyOAuthManager, SwiggyOAuthServer, SwiggyOAuthHandler
+
+    port = SwiggyOAuthManager.get_free_port(8765)
+    server = SwiggyOAuthServer(("127.0.0.1", port), SwiggyOAuthHandler)
+    server_t = threading.Thread(target=server.serve_forever, daemon=True)
+    server_t.start()
+
+    try:
+        # 1. Browser GET /oauth/login
+        login_res = requests.get(f"http://127.0.0.1:{port}/oauth/login")
+        assert login_res.status_code == 200, "OAuth login page should return 200"
+        assert "Swiggy OAuth 2.0 Authorization" in login_res.text, "Login page should contain Swiggy OAuth title"
+        assert "Authorize & Link Zoovy Account" in login_res.text, "Login page should contain submit button"
+        console.print(f"  • Browser GET /oauth/login: [green]OK (Status 200, HTML rendered)[/green]")
+
+        # 2. Browser POST /oauth/callback (form submission)
+        cb_res = requests.post(f"http://127.0.0.1:{port}/oauth/callback", data={"phone": "9876543210"})
+        assert cb_res.status_code == 200, "OAuth callback should return 200"
+        assert "Authorization Successful" in cb_res.text, "Callback should return success confirmation"
+        console.print(f"  • Browser POST /oauth/callback: [green]OK (Status 200, Session Captured)[/green]")
+
+        assert server.done_event.is_set(), "Server done_event should be triggered"
+        assert server.oauth_result is not None, "OAuth result should be populated"
+        assert "access_token" in server.oauth_result, "Access token should be present in captured result"
+        console.print(f"  • Captured OAuth Token: [cyan]{server.oauth_result['access_token'][:18]}...[/cyan]")
+        console.print("  [bold green]✓ Swiggy OAuth 2.0 Browser Server & Callback Flow PASSED[/bold green]\n")
+    finally:
+        server.shutdown()
+        server.server_close()
+
     # Clean up test files
     if test_json_file.exists():
         test_json_file.unlink()
