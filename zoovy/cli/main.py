@@ -193,7 +193,7 @@ def cmd_order(args):
     ollama.model = model
 
     agent = DeliveryAgent(llm_client=ollama)
-    agent.execute_order(prompt=args.prompt, platform_override=args.platform)
+    agent.execute_order(prompt=args.prompt, platform_override=args.platform, use_mcp=args.mcp)
 
 
 def main():
@@ -216,6 +216,7 @@ def main():
     order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
     order_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], help="Force specific delivery platform")
     order_parser.add_argument("--model", type=str, help="Override LLM model tag")
+    order_parser.add_argument("--mcp", action="store_true", help="Execute via official MCP server (Swiggy / Zomato) without opening a browser")
 
     args = parser.parse_args()
     if not args.command:
