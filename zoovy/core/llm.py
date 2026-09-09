@@ -41,6 +41,7 @@ def ensure_ollama_running(host: str = "http://localhost:11434") -> bool:
             [ollama_exe, "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            cwd=str(Path.home()),
             creationflags=creationflags
         )
         for _ in range(15):

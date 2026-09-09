@@ -5,6 +5,24 @@ All notable changes to the **Zoovy** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-09-09
+
+### Added
+- **Emergency Kill Switch (`kill_switch.ps1`, `kill_switch.bat`, `kill_switch.sh`):**
+  - Forcefully terminates all lingering background processes (Python, Ollama, Playwright, Chromium, Node) holding file locks on the Zoovy directory.
+  - Releases all OS directory locks, allowing the folder to be immediately deleted, moved, or updated.
+  - Optional `-PurgeVenv` flag to delete `.venv` and `-PurgeConfig` to wipe `~/.zoovy`.
+  - Double-clickable `kill_switch.bat` for quick desktop cleanup.
+- **CLI Kill Subcommand (`zoovy kill` / `zoovy clean`):**
+  - Integrated into the main CLI with `--purge-config` support.
+
+### Fixed
+- **Daemon CWD Folder Lock in `ensure_ollama_running`:**
+  - Explicitly set `cwd=str(Path.home())` when spawning the detached background `ollama serve` process.
+  - Prevents Windows from placing an exclusive directory handle lock on `zoovy` when a terminal is closed abruptly.
+
+---
+
 ## [0.4.1] - 2026-09-09
 
 ### Added

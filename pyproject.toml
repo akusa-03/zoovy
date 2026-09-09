@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zoovy"
-version = "0.4.1"
+version = "0.4.2"
 description = "Autonomous local AI agent ecosystem for real-world tasks and delivery app automation."
 readme = "README.md"
 requires-python = ">=3.10"

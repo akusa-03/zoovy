@@ -298,6 +298,58 @@ def cmd_address(args):
             console.print(f"[yellow]No address found with label '{label}'.[/yellow]")
 
 
+def cmd_kill(args):
+    """Emergency kill switch: terminate all background processes and unlock resources."""
+    print_banner()
+    console.print("[bold red]🛑 Activating Zoovy Emergency Kill Switch...[/bold red]\n")
+    import psutil
+    from pathlib import Path
+
+    my_pids = {os.getpid()}
+    if hasattr(os, "getppid"):
+        my_pids.add(os.getppid())
+
+    killed = 0
+    for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            if p.pid in my_pids:
+                continue
+            cmd = " ".join(p.info['cmdline'] or []).lower()
+            name = (p.info['name'] or "").lower()
+
+            # Skip the current kill command invocation
+            if "kill" in cmd or "clean" in cmd:
+                continue
+
+            should_kill = False
+            if ("python" in name or "pip" in name) and "zoovy" in cmd:
+                should_kill = True
+            elif ("chromium" in name or "playwright" in name or "node" in name) and "zoovy" in cmd:
+                should_kill = True
+            elif "ollama" in name and "serve" in cmd:
+                should_kill = True
+
+            if should_kill:
+                console.print(f"  [yellow]• Terminating {name} (PID: {p.pid})...[/yellow]")
+                p.kill()
+                killed += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    if killed == 0:
+        console.print("  [green]✓ No active locking background processes found.[/green]")
+    else:
+        console.print(f"\n[bold green]✓ Terminated {killed} background process(es). All directory locks released.[/bold green]")
+
+    if args.purge_config:
+        config_dir = Path.home() / ".zoovy"
+        if config_dir.exists():
+            shutil.rmtree(config_dir, ignore_errors=True)
+            console.print(f"[bold green]✓ Purged configuration at {config_dir}[/bold green]")
+
+    console.print("[dim]The Zoovy directory can now be safely edited, moved, or deleted.[/dim]\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Zoovy: Local Autonomous AI Agent Ecosystem")
     subparsers = parser.add_subparsers(dest="command", help="Subcommands")
@@ -321,6 +373,10 @@ def main():
     addr_parser.add_argument("address_text", nargs="?", type=str, help="Full address string to add, or label to remove")
     addr_parser.add_argument("--label", type=str, default="Home", help="Label for address (e.g. Home, Work, Parents; default: Home)")
 
+    # kill / clean
+    kill_parser = subparsers.add_parser("kill", aliases=["clean"], help="Emergency kill switch: terminate background processes and unlock folder")
+    kill_parser.add_argument("--purge-config", action="store_true", help="Also purge ~/.zoovy (addresses, tokens, audit logs)")
+
     # order
     order_parser = subparsers.add_parser("order", help="Execute autonomous delivery order")
     order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
@@ -341,6 +397,8 @@ def main():
         cmd_login(args)
     elif args.command == "address":
         cmd_address(args)
+    elif args.command in ("kill", "clean"):
+        cmd_kill(args)
     elif args.command == "order":
         cmd_order(args)
 

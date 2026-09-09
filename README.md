@@ -220,6 +220,20 @@ You can connect your Swiggy, Zepto, or Zomato account in two ways:
    ```
    *Captures your session and automatically syncs all cloud delivery addresses to your local machine.*
 
+### H. Emergency Kill Switch & Folder Unlock
+If a terminal window was closed abruptly and Windows reports that `zoovy` is open in another program, run the Kill Switch to terminate lingering background processes, release all file handle locks, and unlock the directory:
+```powershell
+# In PowerShell:
+.\kill_switch.ps1
+
+# Or with CLI:
+zoovy kill
+
+# Full clean wipe (kill procs + delete .venv + delete ~/.zoovy config):
+.\kill_switch.ps1 -All
+```
+*(On Windows, you can also simply double-click `kill_switch.bat`)*
+
 ---
 
 ## 🛡️ Safety & Payment Guardrails
