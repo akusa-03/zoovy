@@ -128,6 +128,30 @@ Output JSON schema:
 
     def execute_order(self, prompt: str, platform_override: Optional[str] = None, use_mcp: bool = False):
         console.print(f"[bold cyan]🧠 Goal Formulation & Analysis:[/bold cyan] '{prompt}'")
+
+        # 0. Platform Disambiguation if not specified
+        detected_platform = None
+        for p in ["zepto", "swiggy", "zomato"]:
+            if p in prompt.lower():
+                detected_platform = p
+                break
+
+        if not platform_override and not detected_platform:
+            console.print("\n[bold cyan]📍 Platform Selection:[/bold cyan]")
+            console.print("No delivery platform was specified in your prompt.")
+            console.print("  [bold green][1] Swiggy[/bold green] (Instamart Groceries & Food - Official MCP)")
+            console.print("  [yellow][2] Zepto[/yellow] (Quick-Commerce)")
+            console.print("  [white][3] Zomato[/white] (Food Delivery)")
+            try:
+                choice = input("\nSelect platform [1-3, Default: 1 (Swiggy)]: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                choice = "1"
+            if choice == "2":
+                platform_override = "zepto"
+            elif choice == "3":
+                platform_override = "zomato"
+            else:
+                platform_override = "swiggy"
         
         # 1. Goal Contract Decomposition
         goal_engine = GoalOrchestrationEngine(self.llm)

@@ -96,11 +96,12 @@ class PaymentGatekeeper:
         console.print()
         console.print(table)
         console.print(Panel(
-            f"[bold cyan]Delivery Destination:[/bold cyan] [bold]{review.delivery_address}[/bold]\n\n"
+            f"[bold cyan]📍 Verified Delivery Destination (Full Address):[/bold cyan]\n"
+            f"[bold green]{review.delivery_address}[/bold green]\n\n"
             "[bold red]🛑 SAFETY PAUSE (Human-in-the-Loop):[/bold red]\n"
-            "• Zoovy has configured your cart and selected your chosen address.\n"
+            "• Zoovy has configured your cart and selected your verified address above.\n"
             "• Zoovy will NEVER enter payment details or auto-debit your money.\n"
-            "• Upon your confirmation, the browser will navigate to the payment screen for you to tap UPI/Card.",
+            "• Upon your confirmation, the session navigates to the payment screen for you to complete UPI/Card authorization.",
             title="🛡️ Zoovy Safety & Authorization Gate",
             border_style="yellow"
         ))
