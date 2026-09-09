@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zoovy"
-version = "0.1.0"
+version = "0.3.0"
 description = "Autonomous local AI agent ecosystem for real-world tasks and delivery app automation."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,15 +12,19 @@ license = {text = "MIT"}
 authors = [
     {name = "Arpan", email = "akusa-03@users.noreply.github.com"}
 ]
-keywords = ["ai-agent", "local-llm", "ollama", "browser-automation", "delivery", "zepto", "swiggy", "zomato"]
+keywords = ["ai-agent", "local-llm", "ollama", "mcp", "delivery", "zepto", "swiggy", "zomato"]
 dependencies = [
-    "playwright>=1.49.0",
     "pydantic>=2.10.0",
     "requests>=2.32.0",
     "rich>=13.9.0",
     "pyyaml>=6.0.2",
     "psutil>=6.1.0",
     "mcp>=1.0.0"
+]
+
+[project.optional-dependencies]
+browser = [
+    "playwright>=1.49.0"
 ]
 
 [project.scripts]

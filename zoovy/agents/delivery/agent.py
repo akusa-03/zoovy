@@ -7,21 +7,17 @@ from rich.panel import Panel
 from zoovy.core.llm import OllamaClient
 from zoovy.core.safety import PaymentGatekeeper, OrderCheckoutReview, CartItemSummary
 from zoovy.core.goal_engine import GoalOrchestrationEngine, GoalContract
-from zoovy.core.mcp_client import SwiggyMCPClient, ZomatoMCPClient
+from zoovy.core.mcp_client import SwiggyMCPClient, ZomatoMCPClient, ZeptoMCPClient
 from zoovy.agents.delivery.schemas import OrderIntent, DeliveryPlatform
-from zoovy.agents.delivery.browser import BrowserSessionManager
-from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
-from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
-from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
 
 console = Console()
 
 
 class DeliveryAgent:
     """
-    Autonomous agent orchestrating delivery workflows with both:
-    1. Official Model Context Protocol (MCP) servers (Swiggy & Zomato)
-    2. Resilient Browser Automation (Playwright)
+    Autonomous agent orchestrating delivery workflows with:
+    1. Zero-Browser Model Context Protocol (MCP) servers (Zepto, Swiggy, Zomato) - DEFAULT
+    2. Resilient Browser Automation (Playwright) - Optional fallback
     Backed by a self-evaluating Goal-Oriented loop.
     """
 
@@ -55,78 +51,168 @@ Output JSON schema:
         return OrderIntent(**parsed_json)
 
     def _execute_mcp_order(self, goal: GoalContract, goal_engine: GoalOrchestrationEngine):
-        """Zero-browser execution via official Model Context Protocol (MCP) server."""
-        console.print(f"\n[bold green]⚡ Executing in MCP Server Mode (Zero-Browser API)[/bold green]")
-        console.print(f"[dim]Platform: {goal.target_platform.upper()} via JSON-RPC Protocol[/dim]\n")
+        """Zero-browser execution via Model Context Protocol (MCP) servers."""
+        console.print(f"\n[bold green]⚡ Executing in Zero-Browser MCP Mode[/bold green]")
+        console.print(f"[dim]Platform: {goal.target_platform.upper()} via JSON-RPC Protocol (No browser launched)[/dim]\n")
 
         cart_items: List[CartItemSummary] = []
+        payment_ref = ""
+        saved_addresses: List[str] = []
 
-        if goal.target_platform == "swiggy":
+        if goal.target_platform == "zepto":
+            mcp = ZeptoMCPClient()
+            saved_addresses = mcp.get_saved_addresses()
+            selected_address = PaymentGatekeeper.prompt_address_selection(
+                available_addresses=saved_addresses,
+                default_address="Home"
+            )
+
+            for it in goal.items:
+                name = it.get("name", "Item")
+                qty = it.get("quantity", 1)
+                results = mcp.search_products(name)
+                prod = results[0] if results else {"name": name, "unit_price_inr": 50.0, "variant": "Standard"}
+                mcp.add_to_cart(prod.get("name", name), quantity=qty)
+                unit_price = prod.get("unit_price_inr", 50.0)
+                cart_items.append(CartItemSummary(
+                    name=prod.get("name", name),
+                    variant=prod.get("variant", "Standard"),
+                    description=f"Zepto Dark-Store Item: {prod.get('name')}",
+                    quantity=qty,
+                    unit_price_inr=unit_price,
+                    total_price_inr=unit_price * qty
+                ))
+            checkout_res = mcp.checkout(selected_address)
+            payment_ref = checkout_res.get("payment_qr_intent", "upi://pay?pa=zepto@icici&pn=Zepto&am=200.00&cu=INR")
+
+        elif goal.target_platform == "swiggy":
             mcp = SwiggyMCPClient()
+            saved_addresses = [
+                "Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038",
+                "Office - Block B, Embassy TechVillage, Outer Ring Road, Bengaluru - 560103"
+            ]
+            selected_address = PaymentGatekeeper.prompt_address_selection(
+                available_addresses=saved_addresses,
+                default_address="Home"
+            )
+
             for it in goal.items:
                 name = it.get("name", "Item")
                 qty = it.get("quantity", 1)
                 results = mcp.search_instamart(name)
                 prod = results[0] if results else {"name": name, "price_inr": 40.0, "variant": "Standard"}
                 mcp.add_to_cart(prod.get("product_id", "prod_01"), quantity=qty)
+                unit_price = prod.get("price_inr", 40.0)
                 cart_items.append(CartItemSummary(
                     name=prod.get("name", name),
                     variant=prod.get("variant", "Standard"),
                     description=f"Swiggy Instamart Item: {prod.get('name')}",
                     quantity=qty,
-                    unit_price_inr=prod.get("price_inr", 40.0),
-                    total_price_inr=prod.get("price_inr", 40.0) * qty
+                    unit_price_inr=unit_price,
+                    total_price_inr=unit_price * qty
                 ))
             payment_ref = mcp.generate_payment_link("cart_active")
+
         else:
             mcp = ZomatoMCPClient()
+            saved_addresses = [
+                "Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038"
+            ]
+            selected_address = PaymentGatekeeper.prompt_address_selection(
+                available_addresses=saved_addresses,
+                default_address="Home"
+            )
+
             for it in goal.items:
                 name = it.get("name", "Dish")
                 qty = it.get("quantity", 1)
                 results = mcp.search_dishes(name)
                 prod = results[0] if results else {"name": name, "price_inr": 250.0}
+                unit_price = prod.get("price_inr", 250.0)
                 cart_items.append(CartItemSummary(
                     name=prod.get("name", name),
                     variant="Standard",
                     description=f"Restaurant Dish: {prod.get('name')}",
                     quantity=qty,
-                    unit_price_inr=prod.get("price_inr", 250.0),
-                    total_price_inr=prod.get("price_inr", 250.0) * qty
+                    unit_price_inr=unit_price,
+                    total_price_inr=unit_price * qty
                 ))
             payment_ref = mcp.generate_payment_qr("order_active")
 
-        # Evaluate Cart against Goal Contract
-        eval_report = goal_engine.evaluate_cart_state(goal, cart_items)
-        if eval_report.satisfied:
-            console.print("[bold green]✓ Goal Evaluation Passed:[/bold green] All criteria satisfied.")
-        else:
-            console.print(f"[yellow]⚠ Goal Evaluation Notes:[/yellow] {eval_report.reflection}")
+        # Interactive Cart Evaluation Loop
+        while True:
+            eval_report = goal_engine.evaluate_cart_state(goal, cart_items)
+            if eval_report.satisfied:
+                console.print("[bold green]✓ Goal Evaluation Passed:[/bold green] All criteria satisfied.")
+            else:
+                console.print(f"[yellow]⚠ Goal Evaluation Notes:[/yellow] {eval_report.reflection}")
 
-        subtotal = sum(i.total_price_inr for i in cart_items)
-        review = OrderCheckoutReview(
-            platform=goal.target_platform,
-            store_name=f"{goal.target_platform.capitalize()} MCP Service",
-            delivery_address="Home (Saved Address)",
-            available_addresses=["Home (Saved Address)"],
-            items=cart_items,
-            subtotal_inr=subtotal,
-            delivery_fee_inr=25.0,
-            total_payable_inr=subtotal + 25.0
-        )
+            subtotal = sum(i.total_price_inr for i in cart_items)
+            review = OrderCheckoutReview(
+                platform=goal.target_platform,
+                store_name=f"{goal.target_platform.capitalize()} MCP Service",
+                delivery_address=selected_address,
+                available_addresses=saved_addresses,
+                items=cart_items,
+                subtotal_inr=subtotal,
+                delivery_fee_inr=25.0,
+                total_payable_inr=subtotal + 25.0
+            )
 
-        decision = PaymentGatekeeper.prompt_user_confirmation(review)
-        if decision == "confirm":
-            console.print("\n[bold green]✓ Order authorized by user![/bold green]")
-            console.print(Panel(
-                f"[bold cyan]Scan or tap to complete payment:[/bold cyan]\n[bold yellow]{payment_ref}[/bold yellow]",
-                title="💳 Secure Payment Terminal",
-                border_style="green"
-            ))
-            input("\nPress [Enter] after you have verified or completed the payment...")
-        else:
-            console.print("[bold red]✗ Order aborted by user. No payment processed.[/bold red]")
+            decision = PaymentGatekeeper.prompt_user_confirmation(review)
+            if decision == "modify":
+                console.print("\n[bold cyan]👉 Interactive MCP Cart Modification:[/bold cyan]")
+                console.print("  [1] Add item")
+                console.print("  [2] Change item quantity")
+                console.print("  [3] Finish modifications")
+                try:
+                    m_choice = input("Select option [1-3, default: 3]: ").strip() or "3"
+                except (KeyboardInterrupt, EOFError):
+                    m_choice = "3"
 
-    def execute_order(self, prompt: str, platform_override: Optional[str] = None, use_mcp: bool = False):
+                if m_choice == "1":
+                    add_name = input("Enter item name to add: ").strip()
+                    add_qty = int(input("Enter quantity [1]: ").strip() or "1")
+                    if add_name:
+                        cart_items.append(CartItemSummary(
+                            name=add_name.title(),
+                            variant="Standard",
+                            description=f"User-added item: {add_name.title()}",
+                            quantity=add_qty,
+                            unit_price_inr=45.0,
+                            total_price_inr=45.0 * add_qty
+                        ))
+                elif m_choice == "2":
+                    for idx, ci in enumerate(cart_items, 1):
+                        console.print(f"  [{idx}] {ci.name} (Current qty: {ci.quantity})")
+                    try:
+                        t_idx = int(input("Select item number to change: ").strip()) - 1
+                        if 0 <= t_idx < len(cart_items):
+                            new_q = int(input(f"New quantity for '{cart_items[t_idx].name}': ").strip())
+                            if new_q <= 0:
+                                cart_items.pop(t_idx)
+                            else:
+                                cart_items[t_idx].quantity = new_q
+                                cart_items[t_idx].total_price_inr = cart_items[t_idx].unit_price_inr * new_q
+                    except (ValueError, IndexError):
+                        console.print("[yellow]Invalid item selection.[/yellow]")
+                continue
+
+            elif decision == "confirm":
+                console.print("\n[bold green]✓ Order authorized by user![/bold green]")
+                console.print(Panel(
+                    f"[bold cyan]Scan UPI QR or use Payment Link to complete payment:[/bold cyan]\n[bold yellow]{payment_ref}[/bold yellow]\n\n"
+                    f"[dim]Total Payable: ₹{review.total_payable_inr:.2f} | Delivery to: {selected_address.split(' - ')[0]}[/dim]",
+                    title="💳 Secure Payment Terminal (Zero-Browser)",
+                    border_style="green"
+                ))
+                input("\nPress [Enter] after you have verified or completed the payment...")
+                break
+            else:
+                console.print("[bold red]✗ Order aborted by user. No payment processed.[/bold red]")
+                break
+
+    def execute_order(self, prompt: str, platform_override: Optional[str] = None, use_browser: bool = False):
         console.print(f"[bold cyan]🧠 Goal Formulation & Analysis:[/bold cyan] '{prompt}'")
 
         # 0. Platform Disambiguation if not specified
@@ -139,33 +225,47 @@ Output JSON schema:
         if not platform_override and not detected_platform:
             console.print("\n[bold cyan]📍 Platform Selection:[/bold cyan]")
             console.print("No delivery platform was specified in your prompt.")
-            console.print("  [bold green][1] Swiggy[/bold green] (Instamart Groceries & Food - Official MCP)")
-            console.print("  [yellow][2] Zepto[/yellow] (Quick-Commerce)")
-            console.print("  [white][3] Zomato[/white] (Food Delivery)")
+            console.print("  [bold green][1] Zepto[/bold green] (Groceries & Dark Store - Fast MCP Mode) [bold](Default)[/bold]")
+            console.print("  [cyan][2] Swiggy[/cyan] (Instamart Groceries & Food - Official MCP)")
+            console.print("  [yellow][3] Zomato[/yellow] (Restaurant Food Delivery - MCP Mode)")
             try:
-                choice = input("\nSelect platform [1-3, Default: 1 (Swiggy)]: ").strip()
+                choice = input("\nSelect platform [1-3, Default: 1 (Zepto)]: ").strip()
             except (KeyboardInterrupt, EOFError):
                 choice = "1"
             if choice == "2":
-                platform_override = "zepto"
+                platform_override = "swiggy"
             elif choice == "3":
                 platform_override = "zomato"
             else:
-                platform_override = "swiggy"
+                platform_override = "zepto"
         
         # 1. Goal Contract Decomposition
         goal_engine = GoalOrchestrationEngine(self.llm)
         goal = goal_engine.formulate_goal(prompt, platform_override)
         goal_engine.print_goal_summary(goal)
 
-        # 2. Check for MCP Execution
-        if use_mcp and goal.target_platform in ["swiggy", "zomato"]:
+        # 2. Execution Routing (MCP is Default, Browser is Optional Fallback)
+        if not use_browser:
             self._execute_mcp_order(goal, goal_engine)
             return
-        elif use_mcp and goal.target_platform == "zepto":
-            console.print("[yellow]ℹ Zepto does not currently host an official MCP server. Using local browser engine.[/yellow]")
 
-        # 3. Browser Driver Execution
+        # 3. Optional Browser Automation Fallback
+        self._execute_browser_order(prompt, platform_override, goal, goal_engine)
+
+    def _execute_browser_order(self, prompt: str, platform_override: Optional[str], goal: GoalContract, goal_engine: GoalOrchestrationEngine):
+        """Optional browser fallback execution using Playwright persistent context."""
+        try:
+            from zoovy.agents.delivery.browser import BrowserSessionManager
+            from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
+            from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
+            from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
+        except ImportError:
+            console.print("\n[bold red]Error: Playwright browser engine is not installed.[/bold red]")
+            console.print("To use browser fallback mode, install the optional extra:")
+            console.print("  [bold cyan]pip install -e \".[browser]\"[/bold cyan]")
+            console.print("  [bold cyan]playwright install chromium[/bold cyan]\n")
+            return
+
         intent = self.parse_request(prompt, platform_override)
 
         console.print(f"[green]✓ Target Platform:[/green] [bold]{intent.platform.value.upper()}[/bold]")

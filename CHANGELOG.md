@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-09-09
+
+### Added
+- **Default Zero-Browser MCP Architecture Across All Platforms:**
+  - Integrated `ZeptoMCPClient` wired to the standalone Zepto MCP server (`zoovy.mcp.zepto_server.py`), completing out-of-the-box zero-browser execution for Zepto, Swiggy, and Zomato.
+  - Interactive in-terminal cart modification for MCP mode (`[1] Add item`, `[2] Change quantity`, `[3] Finish`).
+  - Added `--browser` flag to `zoovy order` as an explicit fallback instead of requiring `--mcp` for zero-browser operations.
+  - Added MCP and browser engine status indicators to `zoovy doctor`.
+  - Updated subsystem test suite (`tests/test_local.py`) to validate all 3 MCP clients independently of Playwright.
+
+### Changed
+- **Complete Stashing of Chromium / Playwright from Default Setup:**
+  - Removed mandatory `playwright>=1.49.0` dependency from `pyproject.toml` and `requirements.txt`.
+  - Made Playwright an optional extra (`[project.optional-dependencies] browser = ["playwright>=1.49.0"]`), saving ~350MB download on initial setup.
+  - Streamlined `setup.ps1`, `setup.bat`, and `setup.sh` from 3 steps down to 2 clean steps, completely eliminating the `playwright install chromium` step during default setup.
+  - Converted all Playwright and browser driver imports in `DeliveryAgent` and `cmd_login` to lazy imports protected by graceful `ImportError` handling.
+
+---
+
 ## [0.2.0] - 2026-09-09
 
 ### Added

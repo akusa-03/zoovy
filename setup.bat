@@ -14,26 +14,24 @@ if %ERRORLEVEL% neq 0 (
 )
 
 if not exist ".venv" (
-    echo [1/3] Creating virtual environment (.venv)...
+    echo [1/2] Creating virtual environment (.venv)...
     python -m venv .venv
 ) else (
-    echo [1/3] Virtual environment (.venv) already exists.
+    echo [1/2] Virtual environment (.venv) already exists.
 )
 
-echo [2/3] Installing Zoovy and dependencies...
+echo [2/2] Installing Zoovy and zero-browser MCP dependencies...
 call .venv\Scripts\activate.bat
 pip install -e .
 
-echo [3/3] Installing Playwright browser engine...
-playwright install chromium
-
 echo.
 echo ============================================
-echo   Zoovy Setup Completed Successfully!
+echo   Zoovy Setup Completed Successfully! (MCP Mode)
 echo ============================================
 echo Next steps:
 echo   1. Start Ollama:   ollama serve
 echo   2. Run diagnosis:  .venv\Scripts\zoovy doctor
 echo   3. Setup model:    .venv\Scripts\zoovy setup
+echo   4. Order via MCP:  .venv\Scripts\zoovy order "Get 4 cans of diet coke"
 echo.
 pause

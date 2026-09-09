@@ -1,7 +1,7 @@
-playwright>=1.49.0
 pydantic>=2.10.0
 requests>=2.32.0
 rich>=13.9.0
 pyyaml>=6.0.2
 psutil>=6.1.0
 mcp>=1.0.0
+

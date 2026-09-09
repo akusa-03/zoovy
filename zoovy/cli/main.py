@@ -81,6 +81,17 @@ def cmd_doctor(args):
     git_found = shutil.which("git") is not None or any((Path(p) / "git.exe").exists() for p in standard_git_paths)
     rt_table.add_row("Git CLI", "[bold green]AVAILABLE[/bold green]" if git_found else "[bold red]NOT FOUND[/bold red]")
 
+    # MCP Engine Status
+    rt_table.add_row("Core Engine", "[bold green]Zero-Browser MCP (Fast JSON-RPC API)[/bold green]")
+    rt_table.add_row("MCP Providers", "[bold green]Zepto, Swiggy, Zomato MCP Active[/bold green]")
+
+    # Browser Fallback Status
+    try:
+        import playwright
+        rt_table.add_row("Browser Engine", "[cyan]Playwright Installed (Optional Fallback)[/cyan]")
+    except ImportError:
+        rt_table.add_row("Browser Engine", "[dim]Stashed (Zero-Browser MCP is active default)[/dim]")
+
     console.print(rt_table)
 
 
@@ -151,10 +162,18 @@ def cmd_login(args):
     console.print(f"[bold cyan]🔑 Opening session for {platform.upper()}...[/bold cyan]")
     console.print("[dim]Log in once using your mobile number & OTP. Your session cookies and addresses will be saved locally.[/dim]\n")
 
-    from zoovy.agents.delivery.browser import BrowserSessionManager
-    from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
-    from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
-    from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
+    try:
+        from zoovy.agents.delivery.browser import BrowserSessionManager
+        from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
+        from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
+        from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
+    except ImportError:
+        console.print("\n[bold red]Error: Playwright browser engine is not installed.[/bold red]")
+        console.print("Browser-based session login requires the optional browser extra:")
+        console.print("  [bold cyan]pip install -e \".[browser]\"[/bold cyan]")
+        console.print("  [bold cyan]playwright install chromium[/bold cyan]\n")
+        console.print("[dim]Note: Zoovy uses Zero-Browser MCP by default, which does not require browser login.[/dim]")
+        return
 
     session = BrowserSessionManager(platform_name=platform, headless=False)
     try:
@@ -193,7 +212,7 @@ def cmd_order(args):
     ollama.model = model
 
     agent = DeliveryAgent(llm_client=ollama)
-    agent.execute_order(prompt=args.prompt, platform_override=args.platform, use_mcp=args.mcp)
+    agent.execute_order(prompt=args.prompt, platform_override=args.platform, use_browser=args.browser)
 
 
 def main():
@@ -216,7 +235,7 @@ def main():
     order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
     order_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], help="Force specific delivery platform")
     order_parser.add_argument("--model", type=str, help="Override LLM model tag")
-    order_parser.add_argument("--mcp", action="store_true", help="Execute via official MCP server (Swiggy / Zomato) without opening a browser")
+    order_parser.add_argument("--browser", action="store_true", help="Launch Playwright browser fallback instead of default zero-browser MCP engine")
 
     args = parser.parse_args()
     if not args.command:

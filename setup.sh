@@ -10,24 +10,23 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 if [ ! -d ".venv" ]; then
-    echo "[1/3] Creating virtual environment (.venv)..."
+    echo "[1/2] Creating virtual environment (.venv)..."
     python3 -m venv .venv
 else
-    echo "[1/3] Virtual environment (.venv) already exists."
+    echo "[1/2] Virtual environment (.venv) already exists."
 fi
 
-echo "[2/3] Installing Zoovy and dependencies..."
+echo "[2/2] Installing Zoovy and zero-browser MCP dependencies..."
 source .venv/bin/activate
 pip install -e .
 
-echo "[3/3] Installing Playwright Chromium browser engine..."
-playwright install chromium
-
 echo ""
 echo "============================================"
-echo "   Zoovy Setup Completed Successfully!"
+echo "   Zoovy Setup Completed Successfully! (MCP Mode)"
 echo "============================================"
 echo "Next steps:"
 echo "  1. Activate venv:  source .venv/bin/activate"
 echo "  2. Run diagnosis:  zoovy doctor"
 echo "  3. Download model: zoovy setup"
+echo "  4. Order via MCP:  zoovy order 'Get 4 cans of diet coke'"
+

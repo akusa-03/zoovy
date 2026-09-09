@@ -3,15 +3,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://python.org)
 [![Engine: Ollama](https://img.shields.io/badge/Engine-Ollama%20Local-purple.svg)](https://ollama.com)
-[![MCP: Model Context Protocol](https://img.shields.io/badge/MCP-Official%20Servers-blueviolet.svg)](https://modelcontextprotocol.io)
-[![Browser: Playwright](https://img.shields.io/badge/Browser-Playwright%20(Fallback)-red.svg)](https://playwright.dev)
+[![MCP: Model Context Protocol](https://img.shields.io/badge/MCP-Zero--Browser%20Default-blueviolet.svg)](https://modelcontextprotocol.io)
+[![Browser: Optional Extra](https://img.shields.io/badge/Browser-Optional%20Fallback-lightgrey.svg)](https://playwright.dev)
 [![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-orange.svg)](CHANGELOG.md)
 
-**Zoovy** is an open-source, fully local autonomous AI agent ecosystem designed to automate real-world commerce and delivery tasks (**Swiggy**, **Zomato**, and **Zepto**).
+**Zoovy** is an open-source, fully local autonomous AI agent ecosystem designed to automate real-world commerce and delivery tasks (**Zepto**, **Swiggy**, and **Zomato**).
 
-Zoovy features a **Dual-Engine Architecture**:
-1. **⚡ Official MCP Engine (Zero-Browser API - Stashing Chromium):** Connects directly to **Swiggy Builders Club** (`mcp.swiggy.com`), **Zomato MCP**, and our standalone **Zepto MCP Server** over standardized JSON-RPC tools. No browser windows pop up, operations take sub-seconds, and payments are generated as native UPI QR codes.
-2. **🌐 Resilient Browser Engine (Fallback):** Persistent Chromium automation with anti-detection and cookie persistence when direct MCP accounts are unconfigured.
+Zoovy is built around a **Zero-Browser Model Context Protocol (MCP) Architecture**:
+1. **⚡ Zero-Browser MCP Engine (Default - Chromium Stashed):** Connects directly to **Zepto Dark Stores** (standalone MCP server), **Swiggy Builders Club** (`mcp.swiggy.com`), and **Zomato MCP** over standardized JSON-RPC tools. Instant execution, no heavy browser downloads, and payments returned as native UPI QR codes.
+2. **🌐 Resilient Browser Engine (Optional Fallback):** Playwright Chromium automation with cookie persistence, available as an optional extra (`pip install -e ".[browser]"`) when direct MCP accounts are unconfigured.
 
 All orders are governed by a **Goal-Based Evaluator-Optimizer Engine** (Reflexion loop) and a strict **Human-in-the-Loop (HITL) Payment Firewall**.
 
@@ -20,13 +20,13 @@ All orders are governed by a **Goal-Based Evaluator-Optimizer Engine** (Reflexio
 ## 🌟 Key Features
 
 - 🧠 **100% Local Intelligence:** Powered by local open-weights LLMs via [Ollama](https://ollama.com) (zero API costs, complete privacy, runs on your GPU).
-- ⚡ **Official Model Context Protocol (MCP) Integration:**
+- ⚡ **Zero-Browser MCP by Default (No Chromium Needed):**
+  - **Zepto:** Standalone custom MCP server (`zoovy.mcp.zepto_server`) built on the official MCP 2.x standard with live dark-store catalog search, cart mutations, and checkout intents.
   - **Swiggy:** 49 native tools across Food delivery, Instamart groceries (40,000+ SKUs), and Dineout table reservations.
-  - **Zomato:** Zero-browser restaurant menus, item customization, and instant UPI QR payments.
-  - **Zepto:** Standalone custom MCP server (`zoovy.mcp.zepto_server`) built on the official MCP 2.x standard.
+  - **Zomato:** Zero-browser restaurant menus, dish discovery, item customization, and instant UPI QR payments.
 - 🎯 **Goal-Oriented Evaluator-Optimizer Loop:** Deconstructs prompts into formal **Acceptance Criteria** and **Negative Constraints**, evaluates live cart state, and executes self-correcting reflexion cycles before showing the invoice.
 - 📍 **Full Address Verification:** Shows the full, unabridged delivery destination (house/flat number, building, street, landmark, and pincode) before authorization.
-- 🛒 **Interactive Cart Modification:** Edit your cart live (`[m] Modify`) and press Enter to have Zoovy re-inspect items and recalculate totals automatically.
+- 🛒 **Interactive Cart Modification:** Edit your cart live (`[m] Modify`) to add items, delete items, or adjust quantities with automatic invoice recalculation.
 - 🛡️ **Human-in-the-Loop Payment Firewall:** AI prepares the cart, resolves variants, and verifies totals, but **never** auto-debits funds. Payment requires your manual confirmation.
 
 ---
@@ -46,26 +46,26 @@ flowchart TD
 
     GoalEngine <--> Core
 
-    subgraph DualEngine ["Dual Execution Engines"]
+    subgraph ExecutionEngines ["Execution Engines"]
         subgraph MCPEngine ["⚡ Zero-Browser MCP Engine (Default / Stashed Chromium)"]
+            ZeptoMCP["Custom Zepto MCP Server (zoovy.mcp.zepto_server)"]
             SwiggyMCP["Swiggy Builders Club MCP (mcp.swiggy.com)"]
             ZomatoMCP["Zomato MCP Server"]
-            ZeptoMCP["Custom Zepto MCP Server (zoovy.mcp.zepto_server)"]
         end
 
-        subgraph BrowserEngine ["🌐 Resilient Browser Engine (Fallback)"]
-            Playwright["Persistent Browser Manager (browser.py)"]
+        subgraph BrowserEngine ["🌐 Resilient Browser Engine (Optional Fallback)"]
+            Playwright["Persistent Browser Context (browser.py)"]
             ZeptoDriver["Zepto Driver"]
             SwiggyDriver["Swiggy Driver"]
             ZomatoDriver["Zomato Driver"]
         end
     end
 
-    GoalEngine -->|"Mode: --mcp"| MCPEngine
-    GoalEngine -->|"Mode: Browser"| BrowserEngine
+    GoalEngine -->|"Default: Zero-Browser MCP"| MCPEngine
+    GoalEngine -.->|"Optional: --browser fallback"| BrowserEngine
 
-    MCPEngine -->|"Cart State"| GoalEngine
-    BrowserEngine -->|"Scraped Cart"| GoalEngine
+    MCPEngine -->|"Cart State & Bill"| GoalEngine
+    BrowserEngine -.->|"Scraped Cart"| GoalEngine
 
     GoalEngine -->|"Verified Contract"| Gate
     Gate -.->|"Presents Invoice, Full Address & UPI QR"| User
@@ -86,20 +86,21 @@ Zoovy defaults out-of-the-box to **`qwen2.5:1.5b`** (~986MB, fast, universal com
 
 ---
 
-## 🛠️ Installation & Quickstart
+## 🛠️ Lightweight 2-Step Setup (No Chromium Download)
+
+Setup is ultra-lightweight because Playwright Chromium (~350MB) is completely stashed by default.
 
 ### 1. Prerequisites
 - **Python 3.10+**
 - **Git**
 - **Ollama:** [Download & Install Ollama](https://ollama.com/download)
 
-### 2. Clone the Repository
+### 2. Clone & Run Setup (2 Quick Steps)
 ```bash
 git clone https://github.com/akusa-03/zoovy.git
 cd zoovy
 ```
 
-### 3. Automated 1-Click Setup
 - **Windows (PowerShell):**
   ```powershell
   .\setup.ps1
@@ -110,39 +111,44 @@ cd zoovy
   chmod +x setup.sh && ./setup.sh
   ```
 
-### 4. Run Hardware Diagnostic
+### 3. Run Hardware Diagnostic
 ```bash
 zoovy doctor
 zoovy setup
 ```
 
+*(Optional: If you ever need the browser fallback engine, run `pip install -e ".[browser]" && playwright install chromium`)*
+
 ---
 
 ## 🚀 Usage Guide
 
-### A. Zero-Browser Mode via Official MCP (Recommended)
-Stashes Chromium entirely. Operates over fast JSON-RPC tools and returns native UPI QR payment links:
+### A. Zero-Browser Orders (Default)
+Operates directly over fast JSON-RPC tools without opening any browser:
 ```bash
-# Order groceries on Swiggy Instamart via MCP
-zoovy order "Get 4 cans of diet coke" --platform swiggy --mcp
+# Order groceries on Zepto (Default)
+zoovy order "Get 4 cans of diet coke to my home"
 
-# Order food on Zomato via MCP
-zoovy order "Order 2 chicken biryanis" --platform zomato --mcp
+# Order groceries on Swiggy Instamart
+zoovy order "Get 1kg tomatoes and Amul butter" --platform swiggy
+
+# Order food on Zomato
+zoovy order "Order 2 chicken biryanis" --platform zomato
 ```
 
 ### B. Interactive Platform Prompt
-If you don't mention a platform in your prompt, Zoovy interactively asks before running:
+If you don't mention a platform in your prompt, Zoovy interactively asks:
 ```bash
 zoovy order "Get 4 cans of diet coke to my home"
 ```
 ```text
 📍 Platform Selection:
 No delivery platform was specified in your prompt.
-  [1] Swiggy (Instamart Groceries & Food - Official MCP)
-  [2] Zepto (Quick-Commerce)
-  [3] Zomato (Food Delivery)
+  [1] Zepto (Groceries & Dark Store - Fast MCP Mode) (Default)
+  [2] Swiggy (Instamart Groceries & Food - Official MCP)
+  [3] Zomato (Restaurant Food Delivery - MCP Mode)
 
-Select platform [1-3, Default: 1 (Swiggy)]:
+Select platform [1-3, Default: 1 (Zepto)]:
 ```
 
 ### C. Standalone Zepto MCP Server
@@ -157,12 +163,18 @@ Whenever Zoovy displays the invoice table, you can interactively inspect or chan
 ```text
 Order Actions:
   [y] Confirm & proceed to payment
-  [m] Modify cart in browser (add/remove items or adjust quantities)
+  [m] Modify cart (add/remove items or adjust quantities)
   [n] Abort order
 
 Select action [y/m/N]:
 ```
-Pressing **`m`** pauses the agent, allows you to adjust items live, and re-calculates the entire invoice upon pressing Enter.
+Pressing **`m`** pauses the agent, lets you add items or adjust quantities live, and re-evaluates the acceptance criteria and invoice automatically.
+
+### E. Optional Browser Fallback Mode
+If you prefer running a visual browser session with persistent cookies:
+```bash
+zoovy order "Get 4 cans of diet coke" --browser
+```
 
 ---
 
@@ -176,4 +188,5 @@ Pressing **`m`** pauses the agent, allows you to adjust items live, and re-calcu
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for details.\n
+Distributed under the MIT License. See `LICENSE` for details.
+\n
