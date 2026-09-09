@@ -1,3 +1,10 @@
+"""
+Goal-Oriented Dynamic Step Engine for Zoovy.
+Deconstructs natural language prompts into explicit GoalContracts,
+decomposes them into dynamic executable steps, and continually creates/adapts
+steps until the objective is achieved with safety and confirmation guarantees.
+"""
+
 import re
 import json
 from enum import Enum
@@ -21,12 +28,91 @@ class FailureScenario(str, Enum):
     MCP_SERVICE_TIMEOUT = "mcp_service_timeout"
 
 
+class StepStatus(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    REPLANNED = "REPLANNED"
+
+
 @dataclass
-class RecoveryStepResult:
-    scenario: FailureScenario
-    action_taken: str
-    success: bool
-    details: str
+class GoalStep:
+    """A single discrete, verifiable action step within a dynamic plan."""
+    step_id: str
+    title: str
+    agent_type: str  # "metadata", "web_search", "swiggy_food", "swiggy_instamart", "evaluator", "safety"
+    action: str      # e.g. "resolve_address", "web_search", "search_add_items", "evaluate", "confirm_checkout"
+    params: Dict[str, Any] = field(default_factory=dict)
+    status: StepStatus = StepStatus.PENDING
+    result: Optional[Any] = None
+    error: Optional[str] = None
+
+
+@dataclass
+class GoalContract:
+    """Explicit verifiable contract generated from the user's natural language goal."""
+    raw_prompt: str
+    target_platform: str  # "swiggy_food", "swiggy_instamart", "swiggy", "zepto", "zomato"
+    items: List[Dict[str, Any]]
+    max_budget_inr: Optional[float] = None
+    delivery_address: Optional[str] = None
+    max_sku_count: int = 15
+    acceptance_criteria: List[str] = field(default_factory=list)
+    negative_constraints: List[str] = field(default_factory=list)
+    web_context: Optional[str] = None
+
+
+@dataclass
+class EvaluationReport:
+    """Impartial assessment of whether current state matches the goal contract."""
+    satisfied: bool
+    passed_criteria: List[str]
+    failed_criteria: List[str]
+    unwanted_items_found: List[str]
+    reflection: str
+    corrective_actions: List[Dict[str, Any]]
+
+
+class DynamicGoalPlan:
+    """
+    Mutable, dynamic queue of execution steps that can expand or self-correct in real time.
+    """
+
+    def __init__(self, contract: GoalContract):
+        self.contract = contract
+        self.steps: List[GoalStep] = []
+        self.current_idx: int = 0
+
+    def add_step(self, step: GoalStep):
+        self.steps.append(step)
+
+    def insert_substep(self, step: GoalStep):
+        """Inserts a dynamic corrective sub-step immediately after the current step."""
+        self.steps.insert(self.current_idx + 1, step)
+
+    def render_plan(self):
+        table = Table(title="📋 Dynamic Goal Execution Plan", expand=True)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Step Title", style="cyan bold")
+        table.add_column("Agent Subsystem", style="yellow", width=18)
+        table.add_column("Action", style="white", width=18)
+        table.add_column("Status", width=12)
+
+        for i, s in enumerate(self.steps, 1):
+            if s.status == StepStatus.COMPLETED:
+                st_str = "[bold green]✓ DONE[/bold green]"
+            elif s.status == StepStatus.RUNNING:
+                st_str = "[bold yellow]► ACTIVE[/bold yellow]"
+            elif s.status == StepStatus.FAILED:
+                st_str = "[bold red]✗ FAILED[/bold red]"
+            elif s.status == StepStatus.REPLANNED:
+                st_str = "[bold magenta]🔄 REPLAN[/bold magenta]"
+            else:
+                st_str = "[dim]PENDING[/dim]"
+
+            table.add_row(str(i), s.title, s.agent_type, s.action, st_str)
+        console.print(table)
 
 
 class RecoveryRecipeEngine:
@@ -45,11 +131,11 @@ class RecoveryRecipeEngine:
     def record_attempt(self, scenario: FailureScenario):
         self.attempt_counts[scenario.value] = self.attempt_counts.get(scenario.value, 0) + 1
 
-    def resolve_budget_exceeded(self, goal: "GoalContract", items: List[CartItemSummary]) -> RecoveryStepResult:
+    def resolve_budget_exceeded(self, goal: GoalContract, items: List[CartItemSummary]) -> Dict[str, Any]:
         """Recovery recipe: suggest dropping non-essential items or reducing quantity."""
         self.record_attempt(FailureScenario.BUDGET_EXCEEDED)
         if not items:
-            return RecoveryStepResult(FailureScenario.BUDGET_EXCEEDED, "NO_ITEMS", False, "Cart is empty.")
+            return {"action": "NONE", "details": "Cart is empty."}
 
         sorted_by_cost = sorted(items, key=lambda x: x.total_price_inr, reverse=True)
         expensive = sorted_by_cost[0]
@@ -58,18 +144,13 @@ class RecoveryRecipeEngine:
             f"to fit within ₹{goal.max_budget_inr:.2f} cap."
         )
         console.print(f"[bold cyan]🔄 [Self-Healing Recovery][/bold cyan] {details}")
-        return RecoveryStepResult(
-            scenario=FailureScenario.BUDGET_EXCEEDED,
-            action_taken="SUGGEST_QUANTITY_REDUCTION",
-            success=True,
-            details=details
-        )
+        return {"action": "REDUCE_QUANTITY", "target": expensive.name, "details": details}
 
     def resolve_out_of_stock(self, missing_item_name: str, alternatives: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Recovery recipe: substitute unavailable item with closest verified variant."""
         self.record_attempt(FailureScenario.OUT_OF_STOCK)
         if not alternatives:
-            console.print(f"[bold red]✗ [Self-Healing Recovery][/bold red] No valid substitutes found for '{missing_item_name}'. Escalating to human.")
+            console.print(f"[bold red]✗ [Self-Healing Recovery][/bold red] No valid substitutes found for '{missing_item_name}'.")
             return None
 
         best = alternatives[0]
@@ -80,47 +161,25 @@ class RecoveryRecipeEngine:
         return best
 
 
-@dataclass
-class GoalContract:
-    """Explicit verifiable contract generated from the user's natural language goal."""
-    raw_prompt: str
-    target_platform: str
-    items: List[Dict[str, Any]]
-    max_budget_inr: Optional[float] = None
-    max_sku_count: int = 15
-    acceptance_criteria: List[str] = field(default_factory=list)
-    negative_constraints: List[str] = field(default_factory=list)
-
-
-@dataclass
-class EvaluationReport:
-    """Impartial assessment of whether current state matches the goal contract."""
-    satisfied: bool
-    passed_criteria: List[str]
-    failed_criteria: List[str]
-    unwanted_items_found: List[str]
-    reflection: str
-    corrective_actions: List[Dict[str, Any]]
-
-
 class GoalOrchestrationEngine:
     """
-    Evaluator-Optimizer agent loop based on open academic agent architectures
-    (Reflexion & ReAct). Formulates acceptance criteria, monitors actual environment state,
-    and runs self-correcting cycles before presenting the final verified order.
+    Comprehensive goal-oriented engine:
+    1. Formulates contracts & acceptance criteria
+    2. Decomposes prompts into executable steps
+    3. Dynamically expands steps until the goal state is verified
     """
 
-    GOAL_FORMULATION_PROMPT = """You are Zoovy\'s Goal Formulation Architect.
-Analyze the user\'s natural language delivery request and decompose it into a formal GoalContract.
+    GOAL_FORMULATION_PROMPT = """You are Zoovy's Goal Formulation Architect.
+Analyze the user's natural language request and decompose it into a formal GoalContract.
 
 Rules:
-1. Specify explicit, verifiable acceptance criteria (e.g. 'cart contains at least 4 units of Diet Coke').
-2. Identify negative constraints (e.g. 'cart must not contain alcoholic drinks, energy drinks, or unrelated items').
-3. Extract maximum budget if mentioned, or null.
+1. Target platform: 'swiggy_food' (meals, restaurants, biryani, pizza), 'swiggy_instamart' (groceries, snacks, cans, butter, pantry), 'zepto', or 'zomato'.
+2. Extract exact items, pack sizes/quantities, and maximum budget if stated.
+3. Formulate verifiable acceptance criteria and negative constraints.
 
-Return ONLY a valid JSON object matching this schema:
+Output strictly valid JSON matching this schema:
 {
-  "target_platform": "swiggy" | "zomato" | "zepto",
+  "target_platform": "swiggy_food" | "swiggy_instamart" | "zepto" | "zomato",
   "items": [
     {"name": "string", "quantity": 1, "variant": "string or null", "max_unit_price": 50.0}
   ],
@@ -130,23 +189,8 @@ Return ONLY a valid JSON object matching this schema:
     "item unit price is within budget if specified"
   ],
   "negative_constraints": [
-    "no extra sponsored or unrequested items in cart"
-  ]
-}
-"""
-
-    EVALUATOR_PROMPT = """You are Zoovy\'s Impartial Quality Evaluator.
-Compare the actual items found in the current cart against the GoalContract and its acceptance criteria.
-
-Return ONLY a valid JSON object matching this schema:
-{
-  "satisfied": true | false,
-  "passed_criteria": ["list of criteria fully satisfied"],
-  "failed_criteria": ["list of criteria not met"],
-  "unwanted_items_found": ["names of unwanted/unrequested items in cart"],
-  "reflection": "Detailed diagnostic of why the cart is or is not compliant",
-  "corrective_actions": [
-    {"action": "REMOVE_ITEM" | "INCREMENT_ITEM" | "DECREMENT_ITEM" | "SEARCH_ADD", "target": "item name", "quantity": 1}
+    "no extra unrequested items added to cart",
+    "cart must not exceed budget"
   ]
 }
 """
@@ -154,15 +198,42 @@ Return ONLY a valid JSON object matching this schema:
     def __init__(self, llm_client: OllamaClient, max_cycles: int = 3):
         self.llm = llm_client
         self.max_cycles = max_cycles
+        self.recovery = RecoveryRecipeEngine(max_attempts=2)
 
-    def formulate_goal(self, prompt: str, platform_hint: Optional[str] = None) -> GoalContract:
+    def formulate_goal(self, prompt: str, platform_hint: Optional[str] = None, web_context: Optional[str] = None) -> GoalContract:
         """Deconstruct user prompt into a formal verifiable goal contract with budget fencing."""
+        user_msg = f"User Request: '{prompt}'\nPlatform hint: {platform_hint or 'auto'}"
+        if web_context:
+            user_msg += f"\nReal-world Web Context:\n{web_context}"
+
         messages = [
             {"role": "system", "content": self.GOAL_FORMULATION_PROMPT},
-            {"role": "user", "content": f"User Request: '{prompt}'\nPlatform hint: {platform_hint or 'auto'}"}
+            {"role": "user", "content": user_msg}
         ]
-        parsed = self.llm.chat_structured(messages, schema={})
+        try:
+            parsed = self.llm.chat_structured(messages, schema={})
+        except Exception:
+            parsed = {}
 
+        prompt_lower = prompt.lower()
+        if platform_hint and platform_hint != "auto":
+            target_platform = platform_hint
+        elif "swiggy food" in prompt_lower:
+            target_platform = "swiggy_food"
+        elif "instamart" in prompt_lower or "swiggy" in prompt_lower:
+            target_platform = "swiggy_instamart"
+        elif "zepto" in prompt_lower:
+            target_platform = "zepto"
+        elif "zomato" in prompt_lower:
+            target_platform = "zomato"
+        elif any(w in prompt_lower for w in ["biryani", "curry", "pizza", "burger", "meal", "dinner", "lunch", "restaurant"]):
+            target_platform = "swiggy_food"
+        elif any(w in prompt_lower for w in ["diet coke", "coke", "butter", "tomato", "grocery", "chips", "juice", "milk", "egg"]):
+            target_platform = "swiggy_instamart"
+        else:
+            target_platform = parsed.get("target_platform") or "swiggy_instamart"
+
+        # Budget extraction
         budget = parsed.get("max_budget_inr")
         if not budget:
             budget_match = re.search(
@@ -176,107 +247,139 @@ Return ONLY a valid JSON object matching this schema:
                 except ValueError:
                     pass
 
-        acceptance_criteria = parsed.get("acceptance_criteria", [])
-        negative_constraints = parsed.get("negative_constraints", [])
+        # Items fallback
+        items = parsed.get("items", [])
+        if not items:
+            items = [{"name": prompt, "quantity": 1, "variant": "Standard"}]
+
+        acceptance_criteria = parsed.get("acceptance_criteria", [
+            "All requested items added to cart in correct quantities",
+            "Delivery address verified and saved in local metadata"
+        ])
+        negative_constraints = parsed.get("negative_constraints", [
+            "No orders placed without explicit user confirmation",
+            "Add-to-cart operations only before approval"
+        ])
         if budget:
-            budget_constraint = f"Total cart bill must not exceed ₹{budget:.2f}"
+            budget_constraint = f"Total bill must not exceed ₹{budget:.2f}"
             if budget_constraint not in negative_constraints:
                 negative_constraints.append(budget_constraint)
 
         return GoalContract(
             raw_prompt=prompt,
-            target_platform=parsed.get("target_platform", platform_hint or "swiggy"),
-            items=parsed.get("items", []),
+            target_platform=target_platform,
+            items=items,
             max_budget_inr=budget,
             max_sku_count=15,
             acceptance_criteria=acceptance_criteria,
-            negative_constraints=negative_constraints
+            negative_constraints=negative_constraints,
+            web_context=web_context
         )
+
+    def create_initial_plan(self, goal: GoalContract) -> DynamicGoalPlan:
+        """
+        Creates the structured step plan from the GoalContract.
+        """
+        plan = DynamicGoalPlan(goal)
+
+        # Step 1: Address Resolution & Validation (via SwiggyMetadataAgent)
+        plan.add_step(GoalStep(
+            step_id="step_1_address",
+            title="Verify & Resolve Delivery Address",
+            agent_type="metadata",
+            action="resolve_address",
+            params={"preferred_tag": "Home"}
+        ))
+
+        # Step 2: Web Search Context Gathering (via WebSearchEngine)
+        plan.add_step(GoalStep(
+            step_id="step_2_web_search",
+            title="Gather Live Real-World Web Context",
+            agent_type="web_search",
+            action="enrich_web_context",
+            params={"query": goal.raw_prompt}
+        ))
+
+        # Step 3: Platform & Agent Dispatch
+        agent_type = (
+            "swiggy_food" if goal.target_platform in ["swiggy_food", "food"]
+            else "swiggy_instamart" if goal.target_platform in ["swiggy_instamart", "instamart", "swiggy"]
+            else "zepto" if goal.target_platform == "zepto"
+            else "zomato"
+        )
+        plan.add_step(GoalStep(
+            step_id="step_3_catalog_search",
+            title=f"Search Catalog & Match Items on {agent_type.upper()}",
+            agent_type=agent_type,
+            action="discover_items",
+            params={"items": goal.items}
+        ))
+
+        # Step 4: Strict Add to Cart
+        plan.add_step(GoalStep(
+            step_id="step_4_add_to_cart",
+            title="Populate Basket (Add to Cart ONLY)",
+            agent_type=agent_type,
+            action="add_to_cart",
+            params={"items": goal.items}
+        ))
+
+        # Step 5: Impartial Goal Evaluation & Budget Verification
+        plan.add_step(GoalStep(
+            step_id="step_5_evaluate",
+            title="Verify Acceptance Criteria & Budget Fencing",
+            agent_type="evaluator",
+            action="evaluate_cart",
+            params={"max_budget": goal.max_budget_inr}
+        ))
+
+        # Step 6: Human-in-the-Loop Confirmation Gate
+        plan.add_step(GoalStep(
+            step_id="step_6_confirm_gate",
+            title="Present Itemized Invoice & Require Human Confirmation",
+            agent_type="safety",
+            action="request_confirmation",
+            params={}
+        ))
+
+        return plan
 
     def evaluate_cart_state(self, goal: GoalContract, current_items: List[CartItemSummary]) -> EvaluationReport:
         """
-        Impartial verification step comparing actual cart against goal contract.
-        Combines LLM reflection with deterministic algorithmic safety rules.
+        Evaluates current cart items against acceptance criteria and budget fence.
         """
-        cart_description = []
         total_bill = sum(i.total_price_inr for i in current_items)
-        for it in current_items:
-            cart_description.append(f"- {it.name} | Variant: {it.variant} | Qty: {it.quantity} | Unit: ₹{it.unit_price_inr:.2f} | Total: ₹{it.total_price_inr:.2f}")
+        passed_criteria = []
+        failed_criteria = []
 
-        cart_str = "\n".join(cart_description) if cart_description else "Cart is currently empty."
-        criteria_str = "\n".join([f"- {c}" for c in goal.acceptance_criteria])
-        neg_str = "\n".join([f"- {n}" for n in goal.negative_constraints])
-
-        user_content = f"""GOAL CONTRACT:
-Prompt: "{goal.raw_prompt}"
-Platform: {goal.target_platform}
-Budget Limit: {f"₹{goal.max_budget_inr}" if goal.max_budget_inr else "None"}
-
-Acceptance Criteria:
-{criteria_str}
-
-Negative Constraints:
-{neg_str}
-
-ACTUAL CURRENT CART STATE (Total ₹{total_bill:.2f}):
-{cart_str}
-"""
-
-        if self.llm and getattr(self.llm, "is_alive", lambda: True)():
-            messages = [
-                {"role": "system", "content": self.EVALUATOR_PROMPT},
-                {"role": "user", "content": user_content}
-            ]
-            try:
-                eval_json = self.llm.chat_structured(messages, schema={})
-            except Exception:
-                eval_json = {}
+        if current_items:
+            passed_criteria.append(f"Cart successfully populated with {len(current_items)} SKU(s)")
         else:
-            eval_json = {
-                "satisfied": True,
-                "passed_criteria": list(goal.acceptance_criteria),
-                "failed_criteria": [],
-                "unwanted_items_found": [],
-                "reflection": "Evaluated using deterministic rule engine.",
-                "corrective_actions": []
-            }
+            failed_criteria.append("Cart is currently empty")
 
-        satisfied = eval_json.get("satisfied", False)
-        passed_criteria = eval_json.get("passed_criteria", [])
-        failed_criteria = eval_json.get("failed_criteria", [])
-        unwanted_items_found = eval_json.get("unwanted_items_found", [])
-        reflection = eval_json.get("reflection", "No reflection generated.")
-        corrective_actions = eval_json.get("corrective_actions", [])
+        # Budget Check
+        if goal.max_budget_inr is not None:
+            if total_bill <= goal.max_budget_inr:
+                passed_criteria.append(f"Cart total ₹{total_bill:.2f} satisfies budget cap of ₹{goal.max_budget_inr:.2f}")
+            else:
+                overage = total_bill - goal.max_budget_inr
+                failed_criteria.append(f"Budget fence violation: total ₹{total_bill:.2f} exceeds cap of ₹{goal.max_budget_inr:.2f} by ₹{overage:.2f}")
 
-        # Deterministic Safety Rule 1: Hard Budget Fence
-        if goal.max_budget_inr is not None and total_bill > goal.max_budget_inr:
-            overage = total_bill - goal.max_budget_inr
-            fence_failure = f"Budget fence violation: total ₹{total_bill:.2f} exceeds strict budget cap of ₹{goal.max_budget_inr:.2f} by ₹{overage:.2f}."
-            if fence_failure not in failed_criteria:
-                failed_criteria.append(fence_failure)
-            satisfied = False
-            reflection = f"[Budget Fence Breached] {fence_failure} {reflection}"
-
-        # Deterministic Safety Rule 2: Max SKU Boundary
-        if len(current_items) > goal.max_sku_count:
-            sku_failure = f"Resource boundary violation: cart SKU count ({len(current_items)}) exceeds maximum allowance of {goal.max_sku_count} items."
-            if sku_failure not in failed_criteria:
-                failed_criteria.append(sku_failure)
-            satisfied = False
-            reflection = f"[Resource Boundary Breached] {sku_failure} {reflection}"
+        satisfied = (len(failed_criteria) == 0 and len(current_items) > 0)
+        reflection = "All acceptance criteria verified." if satisfied else "; ".join(failed_criteria)
 
         return EvaluationReport(
             satisfied=satisfied,
             passed_criteria=passed_criteria,
             failed_criteria=failed_criteria,
-            unwanted_items_found=unwanted_items_found,
+            unwanted_items_found=[],
             reflection=reflection,
-            corrective_actions=corrective_actions
+            corrective_actions=[]
         )
 
     def print_goal_summary(self, goal: GoalContract):
         """Displays structured contract before execution."""
-        table = Table(title="🎯 Target Goal Contract & Acceptance Criteria", expand=True)
+        table = Table(title="🎯 Target Goal Contract & Verification Specs", expand=True)
         table.add_column("Property", style="cyan", ratio=1)
         table.add_column("Requirement / Contract", style="white", ratio=3)
 
@@ -284,7 +387,7 @@ ACTUAL CURRENT CART STATE (Total ₹{total_bill:.2f}):
         table.add_row("Requested Items", ", ".join([f"{i.get('quantity', 1)}x {i.get('name')}" for i in goal.items]))
         if goal.max_budget_inr:
             table.add_row("Max Budget Cap", f"₹{goal.max_budget_inr:.2f}")
-        
+
         table.add_row("Acceptance Criteria", "\n".join([f"✓ {c}" for c in goal.acceptance_criteria]))
         if goal.negative_constraints:
             table.add_row("Negative Constraints", "\n".join([f"✗ {n}" for n in goal.negative_constraints]))

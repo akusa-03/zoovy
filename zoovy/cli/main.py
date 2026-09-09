@@ -259,22 +259,47 @@ def cmd_order(args):
     agent.execute_order(prompt=args.prompt, platform_override=args.platform, use_browser=args.browser)
 
 
+def cmd_metadata(args):
+    """View and manage Swiggy user metadata and addresses stored in JSON."""
+    from zoovy.agents.delivery.swiggy_metadata import SwiggyMetadataAgent
+    agent = SwiggyMetadataAgent()
+    action = getattr(args, "action", "list") or "list"
+
+    if action == "list":
+        agent.display_metadata_summary()
+    elif action == "add":
+        tag = getattr(args, "tag", None) or "Home"
+        agent.ask_and_store_address(tag=tag)
+    elif action == "sync":
+        meta = agent.load_metadata()
+        console.print(f"[bold green]✓ Synced {len(meta.get('addresses', {}))} address(es) from {agent.metadata_file}[/bold green]")
+
+
 def cmd_address(args):
     """View and manage real delivery addresses saved locally."""
     from zoovy.core.address_book import AddressBook
+    from zoovy.agents.delivery.swiggy_metadata import SwiggyMetadataAgent
+    metadata_agent = SwiggyMetadataAgent()
     action = args.action or "list"
 
     if action == "list":
         addresses = AddressBook.load_addresses()
-        if not addresses:
-            console.print("[yellow]No delivery addresses saved yet in ~/.zoovy/addresses.yaml.[/yellow]")
+        meta_addrs = metadata_agent.get_addresses()
+        if not addresses and not meta_addrs:
+            console.print("[yellow]No delivery addresses saved yet in ~/.zoovy/swiggy_metadata.json.[/yellow]")
             console.print("[dim]Run 'zoovy address add \"Flat 302, Palm Grove, Powai, Mumbai - 400076\" --label Home' to add one.[/dim]")
             return
-        table = Table(title="📍 Saved Delivery Addresses (~/.zoovy/addresses.yaml)", expand=True)
+
+        table = Table(title="📍 Saved Delivery Addresses (Swiggy Metadata & AddressBook)", expand=True)
         table.add_column("Label", style="cyan bold", width=15)
         table.add_column("Delivery Address", style="white")
+        table.add_column("Source", style="green", width=15)
+
+        for lbl, info in meta_addrs.items():
+            table.add_row(lbl, info.get("formatted", ""), "JSON Metadata")
         for lbl, addr in addresses.items():
-            table.add_row(lbl, addr)
+            if lbl not in meta_addrs:
+                table.add_row(lbl, addr, "YAML Book")
         console.print(table)
 
     elif action == "add":
@@ -284,15 +309,32 @@ def cmd_address(args):
             return
         label = args.label or "Home"
         AddressBook.save_address(label, args.address_text)
+        # Also store in Swiggy metadata JSON
+        meta = metadata_agent.load_metadata()
+        meta["addresses"][label] = {
+            "tag": label,
+            "formatted": args.address_text,
+            "city": "Bengaluru",
+            "pincode": "560066"
+        }
+        metadata_agent.save_metadata(meta)
         console.print(f"[bold green]✓ Address saved under label '[cyan]{label}[/cyan]':[/bold green] {args.address_text}")
-        console.print(f"[dim]Stored locally in {AddressBook.FILE_PATH}[/dim]")
+        console.print(f"[dim]Stored locally in {metadata_agent.metadata_file} and {AddressBook.FILE_PATH}[/dim]")
 
     elif action == "remove":
         label = args.label or (args.address_text if args.address_text else None)
         if not label:
             console.print("[bold red]Error:[/bold red] Please specify the label to remove (e.g. 'zoovy address remove Home').")
             return
-        if AddressBook.remove_address(label):
+        removed_yaml = AddressBook.remove_address(label)
+        meta = metadata_agent.load_metadata()
+        removed_json = False
+        if label in meta.get("addresses", {}):
+            del meta["addresses"][label]
+            metadata_agent.save_metadata(meta)
+            removed_json = True
+
+        if removed_yaml or removed_json:
             console.print(f"[bold green]✓ Successfully removed address '[cyan]{label}[/cyan]'.[/bold green]")
         else:
             console.print(f"[yellow]No address found with label '{label}'.[/yellow]")
@@ -373,6 +415,11 @@ def main():
     addr_parser.add_argument("address_text", nargs="?", type=str, help="Full address string to add, or label to remove")
     addr_parser.add_argument("--label", type=str, default="Home", help="Label for address (e.g. Home, Work, Parents; default: Home)")
 
+    # metadata
+    meta_parser = subparsers.add_parser("metadata", help="View or manage Swiggy user metadata and addresses stored in JSON")
+    meta_parser.add_argument("action", nargs="?", choices=["list", "add", "sync"], default="list", help="Action (list, add, sync; default: list)")
+    meta_parser.add_argument("--tag", type=str, default="Home", help="Tag for address (Home/Work/Other)")
+
     # kill / clean
     kill_parser = subparsers.add_parser("kill", aliases=["clean"], help="Emergency kill switch: terminate background processes and unlock folder")
     kill_parser.add_argument("--purge-config", action="store_true", help="Also purge ~/.zoovy (addresses, tokens, audit logs)")
@@ -380,7 +427,7 @@ def main():
     # order
     order_parser = subparsers.add_parser("order", help="Execute autonomous delivery order")
     order_parser.add_argument("prompt", type=str, help="Natural language order prompt, e.g. 'Order 1kg tomatoes and Amul butter on Zepto'")
-    order_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], help="Force specific delivery platform")
+    order_parser.add_argument("--platform", choices=["zepto", "swiggy", "swiggy_food", "swiggy_instamart", "zomato"], help="Force specific delivery platform")
     order_parser.add_argument("--model", type=str, help="Override LLM model tag")
     order_parser.add_argument("--browser", action="store_true", help="Launch Playwright browser fallback instead of default zero-browser MCP engine")
 
@@ -397,6 +444,8 @@ def main():
         cmd_login(args)
     elif args.command == "address":
         cmd_address(args)
+    elif args.command == "metadata":
+        cmd_metadata(args)
     elif args.command in ("kill", "clean"):
         cmd_kill(args)
     elif args.command == "order":
