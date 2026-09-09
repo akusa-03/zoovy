@@ -42,9 +42,10 @@ def ensure_ollama_running(host: str = "http://localhost:11434") -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(Path.home()),
-            creationflags=creationflags
+            creationflags=creationflags,
+            start_new_session=(sys.platform != "win32")
         )
-        for _ in range(15):
+        for _ in range(25):
             time.sleep(0.4)
             if client.is_alive():
                 return True
