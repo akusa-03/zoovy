@@ -42,9 +42,10 @@ def ensure_ollama_running(host: str = "http://localhost:11434") -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(Path.home()),
-            creationflags=creationflags
+            creationflags=creationflags,
+            start_new_session=(sys.platform != "win32")
         )
-        for _ in range(15):
+        for _ in range(25):
             time.sleep(0.4)
             if client.is_alive():
                 return True
@@ -97,6 +98,22 @@ class OllamaClient:
             for line in resp.iter_lines():
                 if line:
                     yield json.loads(line.decode("utf-8"))
+
+    def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
+        """
+        Send standard conversational chat request to Ollama returning response text.
+        """
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+            }
+        }
+        res = requests.post(f"{self.host}/api/chat", json=payload, timeout=120)
+        res.raise_for_status()
+        return res.json().get("message", {}).get("content", "")
 
     def chat_structured(self, messages: List[Dict[str, str]], schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
