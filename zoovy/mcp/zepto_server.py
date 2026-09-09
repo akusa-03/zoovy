@@ -80,12 +80,10 @@ def zepto_get_cart() -> str:
 @server.tool()
 def zepto_get_saved_addresses() -> str:
     """
-    Fetch the list of saved delivery locations on the user's logged-in account.
+    Fetch the list of saved delivery locations on the user's logged-in account or local AddressBook.
     """
-    addresses = [
-        "Home - Flat 402, Sunshine Heights, 12th Main Road, Indiranagar, Bengaluru - 560038",
-        "Work - 3rd Floor, Salarpuria Matrix, Bellandur, Bengaluru - 560103"
-    ]
+    from zoovy.core.address_book import AddressBook
+    addresses = AddressBook.get_or_prompt_addresses()
     return json.dumps(addresses, indent=2)
 
 

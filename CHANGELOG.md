@@ -5,6 +5,23 @@ All notable changes to the **Zoovy** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-09-09
+
+### Added
+- **Real User Address Book Manager (`AddressBook` in `zoovy/core/address_book.py`):**
+  - Persistent local delivery address storage at `~/.zoovy/addresses.yaml`.
+  - Automatic interactive address setup on initial execution if no saved locations are found.
+  - On-the-fly address addition during checkout (`[+] Add a new delivery address`).
+- **CLI Address Management Subcommand (`zoovy address`):**
+  - Added commands: `zoovy address list`, `zoovy address add "<address>" --label <Label>`, and `zoovy address remove <label>`.
+- **AddressBook Integration Test (TEST 6 in `tests/test_local.py`):**
+  - Subsystem test verifying local address creation, formatted listing, and clean removal.
+
+### Changed
+- **Eliminated All Hardcoded Dummy Addresses:**
+  - Removed all placeholder addresses (`"Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038"`) from `zoovy/agents/delivery/agent.py`, `zoovy/core/safety.py`, `zoovy/core/mcp_client.py`, and `zoovy/mcp/zepto_server.py`.
+  - All platforms (Zepto, Swiggy, Zomato) now strictly query real user addresses from `AddressBook` or authenticated MCP sessions.
+
 ---
 
 ## [0.4.0] - 2026-09-09

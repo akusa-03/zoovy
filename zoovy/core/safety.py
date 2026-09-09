@@ -102,26 +102,38 @@ class PaymentGatekeeper:
     def prompt_address_selection(available_addresses: List[str], default_address: Optional[str] = None) -> str:
         """
         Displays available saved addresses from the user's account and lets them choose.
+        Allows adding a new address on the fly.
         """
+        from zoovy.core.address_book import AddressBook
+
         if not available_addresses:
-            return default_address or "Primary Saved Address"
+            available_addresses = AddressBook.get_or_prompt_addresses()
 
         console.print("\n[bold cyan]📍 Saved Delivery Addresses on your Account:[/bold cyan]")
         for idx, addr in enumerate(available_addresses, 1):
             is_default = " [green](Default)[/green]" if (default_address and default_address.lower() in addr.lower()) or idx == 1 else ""
             console.print(f"  [bold yellow][{idx}][/bold yellow] {addr}{is_default}")
+        console.print("  [bold yellow][+][/bold yellow] Add a new delivery address")
 
         try:
-            choice = input(f"\nSelect delivery address [1-{len(available_addresses)}] or press Enter for default [1]: ").strip()
-            if choice.isdigit() and 1 <= int(choice) <= len(available_addresses):
+            choice = input(f"\nSelect delivery address [1-{len(available_addresses)}, or + to add new] (Default: 1): ").strip()
+            if choice == "+":
+                label = input("Label (e.g. Home, Office, Parents) [Home]: ").strip() or "Home"
+                new_addr = input("Enter full delivery address: ").strip()
+                if new_addr:
+                    AddressBook.save_address(label, new_addr)
+                    selected = f"{label} - {new_addr}"
+                    console.print(f"[bold green]✓ Saved and selected:[/bold green] {selected}\n")
+                    return selected
+            elif choice.isdigit() and 1 <= int(choice) <= len(available_addresses):
                 selected = available_addresses[int(choice) - 1]
-                console.print(f"[green]✓ Selected Address:[/green] {selected}")
+                console.print(f"[green]✓ Selected Address:[/green] {selected}\n")
                 return selected
         except (KeyboardInterrupt, EOFError):
             pass
 
-        selected = available_addresses[0]
-        console.print(f"[green]✓ Using default Address:[/green] {selected}")
+        selected = available_addresses[0] if available_addresses else "Home - Primary Address"
+        console.print(f"[green]✓ Using default Address:[/green] {selected}\n")
         return selected
 
     @staticmethod

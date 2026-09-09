@@ -28,7 +28,7 @@ All orders are governed by a **Goal-Based Evaluator-Optimizer Engine** (Reflexio
 - 🔄 **Self-Healing Recovery Recipes (`RecoveryRecipeEngine`):** Autonomous recovery actions for out-of-stock items, catalog mismatches, and budget breaches before escalating to the human user.
 - 💰 **Hard Budget Fencing & Resource Scopes:** Deterministic spending caps (`max_budget_inr`) and SKU boundaries (`max_sku_count`) enforced algorithmically in addition to LLM evaluation.
 - 🔒 **Cryptographic Approval Audit Ledger (`ApprovalTokenLedger`):** Immutable local audit log (`~/.zoovy/audit_ledger.jsonl`) recording order token IDs, timestamps, and SHA-256 integrity checksums for complete traceability.
-- 📍 **Full Address Verification:** Shows the full, unabridged delivery destination (house/flat number, building, street, landmark, and pincode) before authorization.
+- 📍 **Real User Address Book & Verification:** Stores user delivery addresses locally in `~/.zoovy/addresses.yaml` via `AddressBook`. Automatically prompts on first run or via `zoovy address` CLI, completely eliminating dummy or placeholder addresses.
 - 🛒 **Interactive Cart Modification:** Edit your cart live (`[m] Modify`) to add items, delete items, or adjust quantities with automatic invoice recalculation.
 - 🛡️ **Human-in-the-Loop Payment Firewall:** AI prepares the cart, resolves variants, and verifies totals, but **never** auto-debits funds. Payment requires your manual confirmation.
 
@@ -45,12 +45,15 @@ flowchart TD
         HW["Hardware Profiler (hardware.py)"]
         LLM["Ollama Local LLM (llm.py)"]
         Recovery["Self-Healing Recovery Engine (RecoveryRecipeEngine)"]
+        AddrBook[("Address Book (addresses.yaml)")]
         Gate["Payment Gatekeeper & Invoice (safety.py)"]
         Ledger[("Immutable Audit Ledger (audit_ledger.jsonl)")]
     end
 
     GoalEngine <--> Core
     GoalEngine <--> Recovery
+    CLI <--> AddrBook
+    Gate <--> AddrBook
 
     subgraph ExecutionEngines ["Execution Engines"]
         subgraph MCPEngine ["⚡ Zero-Browser MCP Engine (Default / Stashed Chromium)"]
@@ -182,6 +185,23 @@ If you prefer running a visual browser session with persistent cookies:
 ```bash
 zoovy order "Get 4 cans of diet coke" --browser
 ```
+
+### F. Real User Address Book Management
+Zoovy never generates or displays placeholder dummy addresses. Manage your real delivery addresses locally in `~/.zoovy/addresses.yaml`:
+```bash
+# List all saved addresses
+zoovy address list
+
+# Add or update your delivery address
+zoovy address add "Flat 302, Palm Grove, Powai, Mumbai - 400076" --label Home
+
+# Add an office address
+zoovy address add "6th Floor, Platina Tower, MG Road, Gurugram - 122002" --label Work
+
+# Remove an address
+zoovy address remove Work
+```
+When running `zoovy order`, if no address is found, Zoovy will interactively prompt you once to save your address. You can also type `+` during checkout to add a new address on the fly.
 
 ---
 

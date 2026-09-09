@@ -165,7 +165,24 @@ fence_report = ge.evaluate_cart_state(strict_budget_goal, mock_items)
 assert not fence_report.satisfied, "Budget fence should have blocked overage!"
 assert any("Budget fence violation" in f for f in fence_report.failed_criteria), "Budget violation not reported!"
 console.print(f"  • Hard Budget Fence: [green]OK[/green] (Blocked ₹{subtotal:.2f} cart exceeding ₹100.00 cap)")
-console.print("  [bold green]✓ Self-Healing Recovery Recipes & Audit Ledger PASSED[/bold green]\n")
+# TEST 6: Real User AddressBook Management
+console.print("[bold yellow]► TEST 6: Real User AddressBook (~/.zoovy/addresses.yaml)[/bold yellow]")
+from zoovy.core.address_book import AddressBook
+test_lbl = "_test_temp_loc"
+test_addr = "Flat 101, Test Residency, Marine Lines, Mumbai - 400020"
+AddressBook.save_address(test_lbl, test_addr)
+addrs = AddressBook.load_addresses()
+assert test_lbl in addrs and addrs[test_lbl] == test_addr, "Address was not saved correctly!"
+console.print(f"  • AddressBook Local Storage: [green]OK[/green] (Persisted test location)")
+
+formatted = AddressBook.get_formatted_list()
+assert any(test_lbl in f for f in formatted), "Formatted list missing test label!"
+console.print(f"  • Formatted Address Selector: [green]OK[/green]")
+
+removed = AddressBook.remove_address(test_lbl)
+assert removed and test_lbl not in AddressBook.load_addresses(), "Failed to remove test address!"
+console.print(f"  • Address Cleanup / Removal: [green]OK[/green]")
+console.print("  [bold green]✓ AddressBook Management PASSED[/bold green]\n")
 
 console.print("[bold green]═══════════════════════════════════════════════════════════════[/bold green]")
 console.print("[bold green]      ALL LOCAL SUBSYSTEM TESTS PASSED WITH 100% SUCCESS!      [/bold green]")

@@ -215,6 +215,45 @@ def cmd_order(args):
     agent.execute_order(prompt=args.prompt, platform_override=args.platform, use_browser=args.browser)
 
 
+def cmd_address(args):
+    """View and manage real delivery addresses saved locally."""
+    from zoovy.core.address_book import AddressBook
+    action = args.action or "list"
+
+    if action == "list":
+        addresses = AddressBook.load_addresses()
+        if not addresses:
+            console.print("[yellow]No delivery addresses saved yet in ~/.zoovy/addresses.yaml.[/yellow]")
+            console.print("[dim]Run 'zoovy address add \"Flat 302, Palm Grove, Powai, Mumbai - 400076\" --label Home' to add one.[/dim]")
+            return
+        table = Table(title="📍 Saved Delivery Addresses (~/.zoovy/addresses.yaml)", expand=True)
+        table.add_column("Label", style="cyan bold", width=15)
+        table.add_column("Delivery Address", style="white")
+        for lbl, addr in addresses.items():
+            table.add_row(lbl, addr)
+        console.print(table)
+
+    elif action == "add":
+        if not args.address_text:
+            console.print("[bold red]Error:[/bold red] Please provide the delivery address text.")
+            console.print("[dim]Usage: zoovy address add \"Flat 302, Palm Grove, Powai, Mumbai - 400076\" --label Home[/dim]")
+            return
+        label = args.label or "Home"
+        AddressBook.save_address(label, args.address_text)
+        console.print(f"[bold green]✓ Address saved under label '[cyan]{label}[/cyan]':[/bold green] {args.address_text}")
+        console.print(f"[dim]Stored locally in {AddressBook.FILE_PATH}[/dim]")
+
+    elif action == "remove":
+        label = args.label or (args.address_text if args.address_text else None)
+        if not label:
+            console.print("[bold red]Error:[/bold red] Please specify the label to remove (e.g. 'zoovy address remove Home').")
+            return
+        if AddressBook.remove_address(label):
+            console.print(f"[bold green]✓ Successfully removed address '[cyan]{label}[/cyan]'.[/bold green]")
+        else:
+            console.print(f"[yellow]No address found with label '{label}'.[/yellow]")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Zoovy: Local Autonomous AI Agent Ecosystem")
     subparsers = parser.add_subparsers(dest="command", help="Subcommands")
@@ -229,6 +268,12 @@ def main():
     # login
     login_parser = subparsers.add_parser("login", help="Log into a delivery platform (saves OTP session locally)")
     login_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], default="zepto", help="Target delivery platform (default: zepto)")
+
+    # address
+    addr_parser = subparsers.add_parser("address", help="View or manage saved local delivery addresses")
+    addr_parser.add_argument("action", nargs="?", choices=["list", "add", "remove"], default="list", help="Action (list, add, remove; default: list)")
+    addr_parser.add_argument("address_text", nargs="?", type=str, help="Full address string to add, or label to remove")
+    addr_parser.add_argument("--label", type=str, default="Home", help="Label for address (e.g. Home, Work, Parents; default: Home)")
 
     # order
     order_parser = subparsers.add_parser("order", help="Execute autonomous delivery order")
@@ -248,6 +293,8 @@ def main():
         cmd_setup(args)
     elif args.command == "login":
         cmd_login(args)
+    elif args.command == "address":
+        cmd_address(args)
     elif args.command == "order":
         cmd_order(args)
 

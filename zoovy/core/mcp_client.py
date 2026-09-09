@@ -169,17 +169,15 @@ class ZeptoMCPClient(BaseMCPPlatformClient):
             return {"items": [], "total_payable_inr": 0.0}
 
     def get_saved_addresses(self) -> List[str]:
-        """Fetch saved delivery addresses via MCP."""
+        """Fetch saved delivery addresses via MCP or local AddressBook."""
         console.print("[cyan]📡 [Zepto MCP][/cyan] Calling tool: [bold]zepto_get_saved_addresses[/bold]")
         try:
             from zoovy.mcp.zepto_server import zepto_get_saved_addresses
             res_raw = zepto_get_saved_addresses()
             return json.loads(res_raw)
         except Exception:
-            return [
-                "Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038",
-                "Work - 3rd Floor, Salarpuria Matrix, Bellandur, Bengaluru - 560103"
-            ]
+            from zoovy.core.address_book import AddressBook
+            return AddressBook.get_or_prompt_addresses()
 
     def checkout(self, address: str) -> Dict[str, Any]:
         """Prepare checkout intent and payment QR via MCP."""

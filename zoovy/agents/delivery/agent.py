@@ -57,12 +57,11 @@ Output JSON schema:
 
         recovery = RecoveryRecipeEngine(max_attempts=2)
         cart_items: List[CartItemSummary] = []
-        payment_ref = ""
-        saved_addresses: List[str] = []
+        from zoovy.core.address_book import AddressBook
+        saved_addresses = AddressBook.get_or_prompt_addresses()
 
         if goal.target_platform == "zepto":
             mcp = ZeptoMCPClient()
-            saved_addresses = mcp.get_saved_addresses()
             selected_address = PaymentGatekeeper.prompt_address_selection(
                 available_addresses=saved_addresses,
                 default_address="Home"
@@ -94,10 +93,6 @@ Output JSON schema:
 
         elif goal.target_platform == "swiggy":
             mcp = SwiggyMCPClient()
-            saved_addresses = [
-                "Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038",
-                "Office - Block B, Embassy TechVillage, Outer Ring Road, Bengaluru - 560103"
-            ]
             selected_address = PaymentGatekeeper.prompt_address_selection(
                 available_addresses=saved_addresses,
                 default_address="Home"
@@ -128,9 +123,6 @@ Output JSON schema:
 
         else:
             mcp = ZomatoMCPClient()
-            saved_addresses = [
-                "Home - Flat 402, Sunshine Heights, Indiranagar, Bengaluru - 560038"
-            ]
             selected_address = PaymentGatekeeper.prompt_address_selection(
                 available_addresses=saved_addresses,
                 default_address="Home"
