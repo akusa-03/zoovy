@@ -99,6 +99,22 @@ class OllamaClient:
                 if line:
                     yield json.loads(line.decode("utf-8"))
 
+    def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
+        """
+        Send standard conversational chat request to Ollama returning response text.
+        """
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+            }
+        }
+        res = requests.post(f"{self.host}/api/chat", json=payload, timeout=120)
+        res.raise_for_status()
+        return res.json().get("message", {}).get("content", "")
+
     def chat_structured(self, messages: List[Dict[str, str]], schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Send a chat completion request with structured JSON enforcement.

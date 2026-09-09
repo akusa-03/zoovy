@@ -63,7 +63,8 @@ Respond with a JSON object:
         self,
         prompt: str,
         web_context: Optional[str] = None,
-        address_override: Optional[str] = None
+        address_override: Optional[str] = None,
+        items_override: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Executes end-to-end food ordering:
@@ -78,13 +79,17 @@ Respond with a JSON object:
         addr_record = self.metadata_agent.resolve_or_prompt_address(preferred_tag=address_override)
         delivery_address = addr_record.get("formatted", "Bengaluru - 560066")
 
-        # 2. Parse Intent with Web Context
-        augmented_prompt = prompt
-        if web_context:
-            augmented_prompt += f"\n[Web Context Reference:\n{web_context}]"
-
-        intent = self.parse_food_intent(augmented_prompt)
-        rest_query = intent.get("restaurant_search", "Restaurant")
+        # 2. Parse Intent with Web Context or use items_override
+        if items_override:
+            items_to_add = items_override
+            rest_query = items_to_add[0].get("name", "Restaurant") if items_to_add else "Restaurant"
+        else:
+            augmented_prompt = prompt
+            if web_context:
+                augmented_prompt += f"\n[Web Context Reference:\n{web_context}]"
+            intent = self.parse_food_intent(augmented_prompt)
+            rest_query = intent.get("restaurant_search", "Restaurant")
+            items_to_add = intent.get("items", [])
 
         # 3. Discover Restaurants via MCP
         restaurants = self.mcp.search_restaurants(
@@ -104,8 +109,8 @@ Respond with a JSON object:
         self.mcp.clear_cart()
         cart_summaries: List[CartItemSummary] = []
 
-        for item_req in intent.get("items", []):
-            name = item_req.get("name", "Dish")
+        for item_req in items_to_add:
+            name = item_req.get("name") or item_req.get("query") or "Dish"
             qty = int(item_req.get("quantity", 1))
 
             dishes = self.mcp.search_dishes(query=name, restaurant_id=selected_rest.get("restaurant_id"))

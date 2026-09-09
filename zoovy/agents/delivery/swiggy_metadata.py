@@ -107,6 +107,13 @@ class SwiggyMetadataAgent:
 
         return next(iter(addrs.values()))
 
+    def get_default_address(self) -> str:
+        """Returns formatted string of default delivery address."""
+        addr = self.get_address()
+        if addr:
+            return f"{addr.get('tag', 'Home')}: {addr.get('formatted', '')}"
+        return "None set (Use /address add)"
+
     def ask_and_store_address(
         self,
         tag: Optional[str] = None,

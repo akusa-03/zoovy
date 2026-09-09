@@ -134,7 +134,8 @@ Output JSON schema:
                     res = self.food_agent.execute_food_order(
                         prompt=prompt,
                         web_context=web_context,
-                        address_override=delivery_address_record.get("tag") if delivery_address_record else None
+                        address_override=delivery_address_record.get("tag") if delivery_address_record else None,
+                        items_override=contract.items
                     )
                     step.status = StepStatus.COMPLETED
                     step.result = res
@@ -146,7 +147,8 @@ Output JSON schema:
                     res = self.instamart_agent.execute_instamart_order(
                         prompt=prompt,
                         web_context=web_context,
-                        address_override=delivery_address_record.get("tag") if delivery_address_record else None
+                        address_override=delivery_address_record.get("tag") if delivery_address_record else None,
+                        items_override=contract.items
                     )
                     step.status = StepStatus.COMPLETED
                     step.result = res

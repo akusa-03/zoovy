@@ -254,6 +254,87 @@ class SwiggyInstamartMCPClient(BaseMCPPlatformClient):
                 "in_stock": True,
                 "description": "Packed with goodness of assorted fruits, rich in Vitamin C."
             }]
+        elif "chicken" in q_lower:
+            return [{
+                "product_id": "im_chicken_biryani_cut_1kg",
+                "name": "Fresh Tender Chicken (Biryani Cut)",
+                "variant": "1 kg",
+                "price_inr": 260.0,
+                "in_stock": True,
+                "description": "Skinless, tender fresh chicken cut specifically for Biryani."
+            }]
+        elif "rice" in q_lower or "basmati" in q_lower:
+            return [{
+                "product_id": "im_daawat_basmati_1kg",
+                "name": "Daawat Rozana Gold Basmati Rice",
+                "variant": "1 kg",
+                "price_inr": 145.0,
+                "in_stock": True,
+                "description": "Long-grain aromatic aged basmati rice for fragrant biryanis."
+            }]
+        elif "masala" in q_lower:
+            return [{
+                "product_id": "im_everest_biryani_masala",
+                "name": "Everest Shahi Biryani Masala",
+                "variant": "50 g",
+                "price_inr": 48.0,
+                "in_stock": True,
+                "description": "Authentic blend of royal spices crafted for biryani."
+            }]
+        elif "curd" in q_lower or "dahi" in q_lower:
+            return [{
+                "product_id": "im_amul_dahi_400g",
+                "name": "Amul Masti Dahi / Curd",
+                "variant": "400 g",
+                "price_inr": 35.0,
+                "in_stock": True,
+                "description": "Thick, creamy curd ideal for biryani marination."
+            }]
+        elif "onion" in q_lower:
+            return [{
+                "product_id": "im_onions_1kg",
+                "name": "Fresh Red Onions",
+                "variant": "1 kg",
+                "price_inr": 38.0,
+                "in_stock": True,
+                "description": "Fresh premium red onions for crispy biryani barista."
+            }]
+        elif "ginger" in q_lower or "garlic" in q_lower:
+            return [{
+                "product_id": "im_gg_paste_200g",
+                "name": "Dabur Hommade Ginger Garlic Paste",
+                "variant": "200 g",
+                "price_inr": 55.0,
+                "in_stock": True,
+                "description": "Aromatic culinary paste made from fresh ginger and garlic."
+            }]
+        elif "mint" in q_lower or "pudina" in q_lower:
+            return [{
+                "product_id": "im_mint_leaves_100g",
+                "name": "Fresh Mint Leaves (Pudina)",
+                "variant": "100 g",
+                "price_inr": 15.0,
+                "in_stock": True,
+                "description": "Fresh aromatic mint leaves for biryani aroma."
+            }]
+        elif "coriander" in q_lower:
+            return [{
+                "product_id": "im_coriander_100g",
+                "name": "Fresh Coriander Leaves",
+                "variant": "100 g",
+                "price_inr": 15.0,
+                "in_stock": True,
+                "description": "Fresh farm coriander leaves for garnishing."
+            }]
+        elif "ghee" in q_lower:
+            return [{
+                "product_id": "im_nandini_ghee_200ml",
+                "name": "Nandini Pure Cow Ghee",
+                "variant": "200 ml",
+                "price_inr": 140.0,
+                "in_stock": True,
+                "description": "Traditional pure golden cow ghee with rich aroma."
+            }]
 
         return [{
             "product_id": f"im_{hash(query) % 10000}",

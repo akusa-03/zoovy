@@ -62,7 +62,8 @@ Respond with a JSON object:
         self,
         prompt: str,
         web_context: Optional[str] = None,
-        address_override: Optional[str] = None
+        address_override: Optional[str] = None,
+        items_override: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Executes end-to-end Instamart grocery ordering:
@@ -77,19 +78,22 @@ Respond with a JSON object:
         addr_record = self.metadata_agent.resolve_or_prompt_address(preferred_tag=address_override)
         delivery_address = addr_record.get("formatted", "Bengaluru - 560066")
 
-        # 2. Parse Intent with Web Context
-        augmented_prompt = prompt
-        if web_context:
-            augmented_prompt += f"\n[Web Context Reference:\n{web_context}]"
-
-        intent = self.parse_instamart_intent(augmented_prompt)
+        # 2. Parse Intent with Web Context or use items_override from Goal Contract
+        if items_override:
+            items_to_add = items_override
+        else:
+            augmented_prompt = prompt
+            if web_context:
+                augmented_prompt += f"\n[Web Context Reference:\n{web_context}]"
+            intent = self.parse_instamart_intent(augmented_prompt)
+            items_to_add = intent.get("items", [])
 
         # 3. Search & Add Items to Cart (ADD TO CART ONLY)
         self.mcp.clear_cart()
         cart_summaries: List[CartItemSummary] = []
 
-        for item_req in intent.get("items", []):
-            q = item_req.get("query", "Item")
+        for item_req in items_to_add:
+            q = item_req.get("query") or item_req.get("name") or "Item"
             qty = int(item_req.get("quantity", 1))
             preferred_var = item_req.get("variant", "Standard")
 

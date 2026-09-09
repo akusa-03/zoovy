@@ -173,9 +173,12 @@ class GoalOrchestrationEngine:
 Analyze the user's natural language request and decompose it into a formal GoalContract.
 
 Rules:
-1. Target platform: 'swiggy_food' (meals, restaurants, biryani, pizza), 'swiggy_instamart' (groceries, snacks, cans, butter, pantry), 'zepto', or 'zomato'.
+1. Target platform: 'swiggy_food' (meals, restaurants, cooked biryani, pizza), 'swiggy_instamart' (groceries, ingredients, snacks, cans, butter, pantry), 'zepto', or 'zomato'.
 2. Extract exact items, pack sizes/quantities, and maximum budget if stated.
 3. Formulate verifiable acceptance criteria and negative constraints.
+4. RECIPE & INGREDIENT EXPANSION RULE: If the request asks for a recipe or ingredients to cook a dish (e.g. 'Find a recipe for chicken biryani and add ingredients to swiggy instamart cart'):
+   - Set target_platform to 'swiggy_instamart'.
+   - You MUST decompose the dish into its raw grocery cooking ingredients (e.g., Fresh Chicken, Basmati Rice, Biryani Masala, Curd, Onions, Ginger Garlic Paste, Mint Leaves, Ghee), NOT the prepared restaurant dish!
 
 Output strictly valid JSON matching this schema:
 {

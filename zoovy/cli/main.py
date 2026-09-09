@@ -392,6 +392,19 @@ def cmd_kill(args):
     console.print("[dim]The Zoovy directory can now be safely edited, moved, or deleted.[/dim]\n")
 
 
+def cmd_chat(args):
+    """Launch the interactive conversational chat box and autonomous REPL shell."""
+    from zoovy.cli.chat import InteractiveChatSession
+    ollama = OllamaClient()
+    if not ensure_ollama_running():
+        console.print("[bold red]Error:[/bold red] Ollama daemon could not be reached or started. Please install Ollama from https://ollama.com.")
+        sys.exit(1)
+
+    model = getattr(args, "model", None)
+    session = InteractiveChatSession(model_name=model)
+    session.run_loop()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Zoovy: Local Autonomous AI Agent Ecosystem")
     subparsers = parser.add_subparsers(dest="command", help="Subcommands")
@@ -431,12 +444,14 @@ def main():
     order_parser.add_argument("--model", type=str, help="Override LLM model tag")
     order_parser.add_argument("--browser", action="store_true", help="Launch Playwright browser fallback instead of default zero-browser MCP engine")
 
-    args = parser.parse_args()
-    if not args.command:
-        parser.print_help()
-        sys.exit(0)
+    # chat
+    chat_parser = subparsers.add_parser("chat", help="Launch interactive conversational chat box (Default)")
+    chat_parser.add_argument("--model", type=str, help="Override LLM model tag")
 
-    if args.command == "doctor":
+    args = parser.parse_args()
+    if not args.command or args.command == "chat":
+        cmd_chat(args)
+    elif args.command == "doctor":
         cmd_doctor(args)
     elif args.command == "setup":
         cmd_setup(args)

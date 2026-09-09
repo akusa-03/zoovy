@@ -31,3 +31,4 @@ config.yaml
 .DS_Store
 Thumbs.db
 *.log
+.uni_cache/
