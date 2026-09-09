@@ -7,17 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-09-09
 
 ### Added
-- Planned: Voice control via local Whisper speech-to-text input.
-- Planned: Vision-augmented UI navigation using `qwen2.5-vl:7b` for canvas and complex graphic delivery menus.
-- Planned: Android Device Bridge (ADB / UIAutomator) for mobile-only platforms.
-- Planned: Multi-store price comparison across Zepto, Swiggy Instamart, and Blinkit for identical grocery carts.
+- **Official Model Context Protocol (MCP) Client (`zoovy/core/mcp_client.py`):**
+  - Integrated official **Swiggy Builders Club MCP** (`mcp.swiggy.com`) supporting 49 native tools across Food, Instamart, and Dineout.
+  - Integrated **Zomato MCP Client** (`mcp.zomato.com`) for zero-browser dish discovery, cart mutations, and instant UPI QR code generation.
+  - Added `--mcp` CLI flag to `zoovy order` to stash Chromium and execute orders purely over JSON-RPC tools.
+- **Standalone Custom Zepto MCP Server (`zoovy/mcp/zepto_server.py`):**
+  - Built a standalone Zepto MCP server adhering to the official Model Context Protocol 2.x standard (`MCPServer`).
+  - Exposes 5 standard quick-commerce tools: `zepto_search_products`, `zepto_add_to_cart`, `zepto_get_cart`, `zepto_get_saved_addresses`, and `zepto_checkout`.
+  - Compatible with Claude Desktop, Cursor, VS Code, and Zoovy over standard I/O (`stdio`).
+- **Goal-Oriented Evaluator-Optimizer Engine (`zoovy/core/goal_engine.py`):**
+  - Implemented an open academic agent architecture based on the **Reflexion** (Shinn et al.) and **ReAct** (Yao et al.) paradigms.
+  - Formulates explicit verifiable **GoalContracts** with target items, acceptance criteria, and negative constraints (e.g. banning unrequested sponsored products).
+  - Employs an independent Evaluator loop that verifies live cart state against acceptance criteria, diagnosing discrepancies and triggering self-correcting reflexion cycles.
+- **Interactive Cart Modification Workflow:**
+  - Added an interactive action loop in `PaymentGatekeeper`: `[y]` Confirm & pay, `[m]` Modify cart live, `[n]` Abort.
+  - Pressing `[m]` keeps the session open for live item adjustments and re-scrapes/re-calculates the invoice upon pressing Enter.
+- **Platform Prompt Disambiguation:**
+  - Added interactive platform selection prompt when the user prompt does not specify a platform keyword and no `--platform` flag is provided.
+- **Full Address Verification:**
+  - Updated the Safety Gatekeeper panel and address selector to render the complete, unabridged delivery address (flat/house number, building, street, landmark, pincode) before payment.
+
+### Fixed
+- **Zepto Scraper Calibration:**
+  - Fixed Zepto search URL query parameter from `?q=` to `?query=`, preventing fallback to unrelated homepage sponsored carousels (e.g., Red Bull).
+  - Sanitized product title extraction to skip action button labels (`ADD`, `OFF`, `BESTSELLER`), prices, and ratings, preventing items from being titled `"ADD"`.
+  - Calibrated quantity stepper selector to target Zepto's SVG accessible button (`button[aria-label="Increase quantity"]`), resolving stuck quantity increments.
+  - Replaced hardcoded fallback dummy items in `inspect_cart()` with live drawer scraping.
+- **Navigation Timeout Fix:**
+  - Replaced `wait_until="networkidle"` with `wait_until="domcontentloaded"` with safe timeouts across all browser drivers, eliminating 30-second timeout freezes caused by continuous analytics/telemetry streams.
 
 ### Changed
-- Configured **`qwen2.5:1.5b`** as the out-of-the-box default LLM (~986MB, ultra-fast, universal compatibility).
-- Enhanced `zoovy setup` with an interactive model selection prompt allowing users to choose between the lightweight default and the hardware-optimized enhanced model (`qwen2.5:14b` / `7b` / `3b`), defaulting to 1.5B on Enter.
+- Configured **`qwen2.5:1.5b`** as the out-of-the-box default LLM (~986MB, fast, universal compatibility) with hardware-matched enhanced tiers (`qwen2.5:14b` / `7b` / `3b`) selectable during setup.
+- Stashed the browser requirement when running in `--mcp` mode in favor of zero-browser JSON-RPC tools.
 - Updated `zoovy doctor` to report both Default and Enhanced model readiness statuses.
 - Added `--model` flag to `zoovy setup` for direct non-interactive model downloading.
 
@@ -26,46 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-09-08
 
 ### Added
-- **Core Architecture & Framework:**
-  - Umbrella project scaffolding for `zoovy` autonomous local AI agent ecosystem.
-  - Modular agent interface (`BaseAgent`) enabling pluggable sub-agents.
-  - Full CLI entry point with subcommands: `doctor`, `setup`, `login`, and `order`.
+- **Core Architecture & Scaffolding:**
+  - Scaffolding for the `zoovy` autonomous local AI agent ecosystem.
+  - CLI entry point with subcommands: `doctor`, `setup`, `login`, and `order`.
 - **Dynamic Hardware Profiler (`zoovy/core/hardware.py`):**
-  - Automatic probing of GPU device, dedicated VRAM, system RAM, and CPU threads.
-  - Hardware classification into 4 performance tiers with tailored model recommendations:
-    - *Tier 1 (>=16GB VRAM):* `qwen2.5:14b` (BFCL v4 88.4%)
-    - *Tier 2 (8GB-15GB VRAM):* `qwen2.5:7b` (BFCL v4 83.1%)
-    - *Tier 3 (4GB-7GB VRAM):* `qwen2.5:3b` (BFCL v4 71.2%)
-    - *Tier 4 (CPU Fallback):* `qwen2.5:3b` / `1.5b`
+  - Probes GPU device, dedicated VRAM, system RAM, and CPU threads with 4 performance tiers.
 - **LLM Engine (`zoovy/core/llm.py`):**
-  - 100% local inference client communicating with Ollama REST API.
-  - Strict JSON tool-calling and structured schema enforcement.
-  - Streaming model pull with live download progress bars.
+  - Local inference client communicating with Ollama REST API with auto-daemon launch.
 - **Safety & Payment Gatekeeper (`zoovy/core/safety.py`):**
   - Deterministic Human-in-the-Loop (HITL) payment firewall.
-  - Real-time cart inspection rendering exact item titles, variant descriptions, quantities, unit prices, and delivery fees.
-  - Account address selection prompt allowing users to choose or verify delivery destinations before checkout.
-  - Physical pause at final payment view; zero automated storage of payment credentials, cards, or UPI PINs.
-- **Delivery Agent Module (`zoovy/agents/delivery/`):**
-  - Autonomous natural language order parser translating user requests into structured `OrderIntent`.
-  - Platform drivers for **Zepto** (`zeptonow.com`), **Swiggy** (`swiggy.com`), and **Zomato** (`zomato.com`).
-  - Persistent Playwright browser session manager storing user profiles, tokens, and cookies in `~/.zoovy/sessions/`.
-  - Account login command (`zoovy login --platform <name>`) for one-time mobile OTP authorization.
-- **Diagnostic Tools:**
-  - `zoovy doctor` command providing formatted terminal tables of system specs, Ollama daemon status, model readiness, and Git availability.
-- **Packaging & Documentation:**
-  - `pyproject.toml` and `requirements.txt` configurations.
-  - Comprehensive `README.md` with system architecture diagrams, quickstart guide, and safety principles.
-  - MIT Open Source License.
-
----
-
-### Format Reference for Future Contributors
-
-When adding new changes to this repository, categorize them under `[Unreleased]` using the following standard headings:
-- `Added`: for new features.
-- `Changed`: for changes in existing functionality.
-- `Deprecated`: for soon-to-be removed features.
-- `Removed`: for now removed features.
-- `Fixed`: for any bug fixes.
-- `Security`: in case of vulnerabilities.
+  - Interactive terminal invoice presentation and address selection.
+- **Initial Browser Delivery Drivers:**
+  - Browser automation drivers for Zepto, Swiggy, and Zomato using Playwright persistent contexts.\n
