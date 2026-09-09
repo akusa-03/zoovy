@@ -37,6 +37,21 @@ class BaseMCPPlatformClient:
     def is_authenticated(self) -> bool:
         return self._auth_token is not None
 
+    def get_saved_addresses(self) -> List[str]:
+        """Fetch saved delivery addresses from cloud account if authenticated, or from local AddressBook."""
+        from zoovy.core.address_book import AddressBook
+        if self.is_authenticated():
+            console.print(f"[cyan]📡 [{self.platform_name.title()} MCP][/cyan] Calling tool: [bold]get_user_addresses[/bold] (Authenticated)")
+            cloud_addrs = self._fetch_cloud_addresses()
+            if cloud_addrs:
+                AddressBook.sync_external_addresses(cloud_addrs)
+                return AddressBook.get_formatted_list()
+        return AddressBook.get_or_prompt_addresses()
+
+    def _fetch_cloud_addresses(self) -> List[str]:
+        """Override in platform subclass to query cloud API."""
+        return []
+
     def list_tools(self) -> List[Dict[str, Any]]:
         """List available tools exposed by the platform MCP server."""
         raise NotImplementedError
@@ -56,6 +71,28 @@ class SwiggyMCPClient(BaseMCPPlatformClient):
 
     def __init__(self):
         super().__init__("swiggy", self.SERVER_URL)
+
+    def _fetch_cloud_addresses(self) -> List[str]:
+        if not self._auth_token:
+            return []
+        try:
+            import requests
+            headers = {
+                "Authorization": f"Bearer {self._auth_token}",
+                "Content-Type": "application/json"
+            }
+            resp = requests.get(f"{self.base_url}/v1/user/addresses", headers=headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                addresses = []
+                for a in data.get("addresses", []):
+                    lbl = a.get("tag", "Home")
+                    full_str = f"{a.get('flat_no', '')}, {a.get('address_line', '')}, {a.get('city', '')} - {a.get('pincode', '')}".strip(", ")
+                    addresses.append(f"{lbl} - {full_str}")
+                return addresses
+        except Exception:
+            pass
+        return []
 
     def search_instamart(self, query: str, address_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Search items in Swiggy Instamart catalog (40,000+ SKUs)."""
@@ -101,6 +138,23 @@ class ZomatoMCPClient(BaseMCPPlatformClient):
 
     def __init__(self):
         super().__init__("zomato", self.SERVER_URL)
+
+    def _fetch_cloud_addresses(self) -> List[str]:
+        if not self._auth_token:
+            return []
+        try:
+            import requests
+            headers = {
+                "Authorization": f"Bearer {self._auth_token}",
+                "Content-Type": "application/json"
+            }
+            resp = requests.get(f"{self.base_url}/v1/user/addresses", headers=headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [f"{a.get('label', 'Home')} - {a.get('address_text', '')}" for a in data.get("addresses", [])]
+        except Exception:
+            pass
+        return []
 
     def search_dishes(self, dish_name: str, location: Optional[str] = None) -> List[Dict[str, Any]]:
         console.print(f"[cyan]📡 [Zomato MCP][/cyan] Calling tool: [bold]search_dishes[/bold] (dish='{dish_name}')")

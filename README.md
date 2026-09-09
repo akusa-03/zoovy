@@ -203,6 +203,23 @@ zoovy address remove Work
 ```
 When running `zoovy order`, if no address is found, Zoovy will interactively prompt you once to save your address. You can also type `+` during checkout to add a new address on the fly.
 
+### G. Linking Accounts & Auto-Syncing Addresses (`zoovy login`)
+You can connect your Swiggy, Zepto, or Zomato account in two ways:
+1. **Zero-Browser MCP Token Link (Default):**
+   Link your session token / JWT once directly in the CLI:
+   ```bash
+   zoovy login --platform swiggy
+   # Or directly:
+   zoovy login --platform swiggy --token "ey..."
+   ```
+   *Zoovy securely stores your token in `~/.zoovy/tokens/swiggy_token.json` and automatically queries `get_user_addresses` to sync your saved account addresses into `~/.zoovy/addresses.yaml`.*
+2. **Visual Browser OTP Login (Optional):**
+   If you installed the browser extra (`pip install -e ".[browser]"`), log in visually with SMS OTP:
+   ```bash
+   zoovy login --platform swiggy --browser
+   ```
+   *Captures your session and automatically syncs all cloud delivery addresses to your local machine.*
+
 ---
 
 ## 🛡️ Safety & Payment Guardrails

@@ -57,16 +57,22 @@ Output JSON schema:
 
         recovery = RecoveryRecipeEngine(max_attempts=2)
         cart_items: List[CartItemSummary] = []
-        from zoovy.core.address_book import AddressBook
-        saved_addresses = AddressBook.get_or_prompt_addresses()
 
         if goal.target_platform == "zepto":
             mcp = ZeptoMCPClient()
-            selected_address = PaymentGatekeeper.prompt_address_selection(
-                available_addresses=saved_addresses,
-                default_address="Home"
-            )
+        elif goal.target_platform == "swiggy":
+            mcp = SwiggyMCPClient()
+        else:
+            mcp = ZomatoMCPClient()
 
+        # Fetch cloud addresses if authenticated via token, or local AddressBook
+        saved_addresses = mcp.get_saved_addresses()
+        selected_address = PaymentGatekeeper.prompt_address_selection(
+            available_addresses=saved_addresses,
+            default_address="Home"
+        )
+
+        if goal.target_platform == "zepto":
             for it in goal.items:
                 name = it.get("name", "Item")
                 qty = it.get("quantity", 1)
@@ -92,12 +98,6 @@ Output JSON schema:
             payment_ref = checkout_res.get("payment_qr_intent", "upi://pay?pa=zepto@icici&pn=Zepto&am=200.00&cu=INR")
 
         elif goal.target_platform == "swiggy":
-            mcp = SwiggyMCPClient()
-            selected_address = PaymentGatekeeper.prompt_address_selection(
-                available_addresses=saved_addresses,
-                default_address="Home"
-            )
-
             for it in goal.items:
                 name = it.get("name", "Item")
                 qty = it.get("quantity", 1)
@@ -122,11 +122,6 @@ Output JSON schema:
             payment_ref = mcp.generate_payment_link("cart_active")
 
         else:
-            mcp = ZomatoMCPClient()
-            selected_address = PaymentGatekeeper.prompt_address_selection(
-                available_addresses=saved_addresses,
-                default_address="Home"
-            )
 
             for it in goal.items:
                 name = it.get("name", "Dish")

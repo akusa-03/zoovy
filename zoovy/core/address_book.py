@@ -47,6 +47,21 @@ class AddressBook:
         return False
 
     @classmethod
+    def sync_external_addresses(cls, external_addresses: List[str]):
+        """
+        Syncs a list of addresses (e.g. from cloud MCP or browser session)
+        into the local addresses.yaml file.
+        """
+        for item in external_addresses:
+            if " - " in item:
+                lbl, addr = item.split(" - ", 1)
+            elif ":" in item:
+                lbl, addr = item.split(":", 1)
+            else:
+                lbl, addr = "Home", item
+            cls.save_address(lbl.strip(), addr.strip())
+
+    @classmethod
     def get_formatted_list(cls) -> List[str]:
         addresses = cls.load_addresses()
         return [f"{label} - {addr}" for label, addr in addresses.items()]

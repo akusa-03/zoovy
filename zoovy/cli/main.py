@@ -156,47 +156,91 @@ def cmd_setup(args):
 
 
 def cmd_login(args):
-    """Open persistent browser for user to log in and save session credentials."""
+    """Log into a delivery platform (via MCP token or optional browser session)."""
     print_banner()
-    platform = args.platform
-    console.print(f"[bold cyan]🔑 Opening session for {platform.upper()}...[/bold cyan]")
-    console.print("[dim]Log in once using your mobile number & OTP. Your session cookies and addresses will be saved locally.[/dim]\n")
+    platform = args.platform.lower()
+    console.print(f"[bold cyan]🔑 Account Session Login for {platform.upper()}[/bold cyan]\n")
 
-    try:
-        from zoovy.agents.delivery.browser import BrowserSessionManager
-        from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
-        from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
-        from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
-    except ImportError:
-        console.print("\n[bold red]Error: Playwright browser engine is not installed.[/bold red]")
-        console.print("Browser-based session login requires the optional browser extra:")
-        console.print("  [bold cyan]pip install -e \".[browser]\"[/bold cyan]")
-        console.print("  [bold cyan]playwright install chromium[/bold cyan]\n")
-        console.print("[dim]Note: Zoovy uses Zero-Browser MCP by default, which does not require browser login.[/dim]")
+    # If user explicitly requested browser-based OTP login
+    if args.browser:
+        try:
+            from zoovy.agents.delivery.browser import BrowserSessionManager
+            from zoovy.agents.delivery.platforms.zepto import ZeptoDriver
+            from zoovy.agents.delivery.platforms.swiggy import SwiggyDriver
+            from zoovy.agents.delivery.platforms.zomato import ZomatoDriver
+        except ImportError:
+            console.print("[bold red]Error: Playwright browser engine is not installed.[/bold red]")
+            console.print("To use browser-based OTP login, install the optional browser extra:")
+            console.print("  [bold cyan]pip install -e \".[browser]\"[/bold cyan]")
+            console.print("  [bold cyan]playwright install chromium[/bold cyan]\n")
+            console.print("[dim]Or run 'zoovy login' without --browser for fast Zero-Browser MCP token setup.[/dim]")
+            return
+
+        session = BrowserSessionManager(platform_name=platform, headless=False)
+        try:
+            page = session.start()
+            if platform == "zepto":
+                driver = ZeptoDriver(page)
+            elif platform == "swiggy":
+                driver = SwiggyDriver(page)
+            else:
+                driver = ZomatoDriver(page)
+
+            driver.navigate_home()
+            console.print("[bold yellow]Please complete login and verify your delivery address in the opened browser window.[/bold yellow]")
+            input("\nPress [Enter] once you are logged in and can see your profile/addresses...")
+
+            saved_addrs = driver.get_saved_addresses()
+            console.print(f"\n[bold green]✓ Session saved successfully for {platform.upper()}![/bold green]")
+            if saved_addrs:
+                from zoovy.core.address_book import AddressBook
+                AddressBook.sync_external_addresses(saved_addrs)
+                console.print(f"Synced {len(saved_addrs)} saved delivery address(es) into ~/.zoovy/addresses.yaml:")
+                for a in saved_addrs:
+                    console.print(f"  • {a}")
+        finally:
+            session.close()
+            console.print("\n[dim]Browser session safely closed and persisted.[/dim]")
         return
 
-    session = BrowserSessionManager(platform_name=platform, headless=False)
-    try:
-        page = session.start()
-        if platform == "zepto":
-            driver = ZeptoDriver(page)
-        elif platform == "swiggy":
-            driver = SwiggyDriver(page)
+    # Zero-Browser MCP Mode Login (Default)
+    token_input = args.token
+    if not token_input:
+        console.print("[bold]⚡ Zero-Browser MCP Account Link[/bold]")
+        console.print(f"Link your {platform.title()} session token to automatically fetch your saved cloud addresses.")
+        console.print("[dim]Tip: You can get your session token/JWT from your browser DevTools (Network tab -> Authorization header)[/dim]\n")
+        try:
+            token_input = input(f"Enter {platform.title()} Session / Auth Token (or press [Enter] to skip): ").strip()
+        except (KeyboardInterrupt, EOFError):
+            return
+
+    if token_input:
+        from zoovy.core.mcp_client import SwiggyMCPClient, ZeptoMCPClient, ZomatoMCPClient
+        client = (
+            SwiggyMCPClient() if platform == "swiggy"
+            else ZeptoMCPClient() if platform == "zepto"
+            else ZomatoMCPClient()
+        )
+        client.save_token({"access_token": token_input, "platform": platform})
+        console.print(f"\n[bold green]✓ Successfully linked {platform.upper()} account![/bold green]")
+        console.print(f"[dim]Stored locally in {client.token_file}[/dim]")
+
+        # Fetch cloud addresses
+        cloud_addrs = client.get_saved_addresses()
+        if cloud_addrs:
+            console.print(f"\n[bold green]✓ Synced {len(cloud_addrs)} delivery address(es) from your account:[/bold green]")
+            for a in cloud_addrs:
+                console.print(f"  • {a}")
+    else:
+        from zoovy.core.address_book import AddressBook
+        addrs = AddressBook.load_addresses()
+        if addrs:
+            console.print(f"[green]Using your local AddressBook ({len(addrs)} address(es) in ~/.zoovy/addresses.yaml):[/green]")
+            for lbl, addr in addrs.items():
+                console.print(f"  • [cyan]{lbl}[/cyan]: {addr}")
         else:
-            driver = ZomatoDriver(page)
-
-        driver.navigate_home()
-        console.print("[bold yellow]Please complete login and verify your delivery address in the opened browser window.[/bold yellow]")
-        input("\nPress [Enter] once you are logged in and can see your profile/addresses...")
-
-        saved_addrs = driver.get_saved_addresses()
-        console.print(f"\n[bold green]✓ Session saved successfully for {platform.upper()}![/bold green]")
-        console.print(f"Found {len(saved_addrs)} saved delivery address(es) on this account:")
-        for a in saved_addrs:
-            console.print(f"  • {a}")
-    finally:
-        session.close()
-        console.print("\n[dim]Browser session safely closed and persisted.[/dim]")
+            console.print("\n[dim]No token entered. Zoovy will use your local address book.[/dim]")
+            console.print("[dim]Run 'zoovy address add \"<address>\" --label Home' to save your delivery location manually.[/dim]")
 
 
 def cmd_order(args):
@@ -266,8 +310,10 @@ def main():
     setup_parser.add_argument("--model", type=str, help="Specify model tag to pull directly (e.g. 'qwen2.5:1.5b', 'qwen2.5:14b')")
 
     # login
-    login_parser = subparsers.add_parser("login", help="Log into a delivery platform (saves OTP session locally)")
-    login_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], default="zepto", help="Target delivery platform (default: zepto)")
+    login_parser = subparsers.add_parser("login", help="Log into a delivery platform (MCP token or browser session)")
+    login_parser.add_argument("--platform", choices=["zepto", "swiggy", "zomato"], default="swiggy", help="Target delivery platform (default: swiggy)")
+    login_parser.add_argument("--token", type=str, help="Direct session auth token or API key for MCP mode")
+    login_parser.add_argument("--browser", action="store_true", help="Launch visual browser OTP login instead of Zero-Browser MCP token")
 
     # address
     addr_parser = subparsers.add_parser("address", help="View or manage saved local delivery addresses")

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - On-the-fly address addition during checkout (`[+] Add a new delivery address`).
 - **CLI Address Management Subcommand (`zoovy address`):**
   - Added commands: `zoovy address list`, `zoovy address add "<address>" --label <Label>`, and `zoovy address remove <label>`.
+- **MCP Token Authentication & Cloud Address Syncing (`zoovy login`):**
+  - Added Zero-Browser MCP account login via session tokens / JWTs (`zoovy login --platform swiggy --token "..."`).
+  - Automatic cloud address retrieval (`get_user_addresses` tool) pulling saved delivery addresses from authenticated Swiggy / Zepto / Zomato cloud accounts into local `AddressBook`.
+  - Browser login session (`zoovy login --browser`) now also automatically captures and syncs account addresses into `~/.zoovy/addresses.yaml`.
 - **AddressBook Integration Test (TEST 6 in `tests/test_local.py`):**
   - Subsystem test verifying local address creation, formatted listing, and clean removal.
 
