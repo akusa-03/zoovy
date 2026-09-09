@@ -134,6 +134,40 @@ except Exception:
 
 console.print("  [bold green]✓ Zero-Browser MCP Engine PASSED[/bold green]\n")
 
+# TEST 5: Self-Healing Recovery Recipes & Cryptographic Audit Ledger
+console.print("[bold yellow]► TEST 5: Self-Healing Recovery Recipes & Audit Ledger[/bold yellow]")
+from zoovy.core.safety import ApprovalTokenLedger
+from zoovy.core.goal_engine import GoalContract, RecoveryRecipeEngine, FailureScenario, GoalOrchestrationEngine
+
+# 1. Audit Ledger Test
+audit_entry = ApprovalTokenLedger.record_event(review, "confirm")
+assert audit_entry["token_id"].startswith("tok_"), "Invalid token ID format!"
+assert len(audit_entry["integrity_checksum"]) == 64, "Checksum must be valid SHA-256 hex!"
+console.print(f"  • Cryptographic Audit Token: [green]OK[/green] ({audit_entry['token_id']}, Checksum: {audit_entry['integrity_checksum'][:16]}...)")
+
+# 2. Recovery Recipe Engine Test
+rec_engine = RecoveryRecipeEngine(max_attempts=2)
+substitute = rec_engine.resolve_out_of_stock("Exotic Soda", [{"name": "Diet Coke Can", "unit_price_inr": 50.0}])
+assert substitute is not None and substitute["name"] == "Diet Coke Can"
+console.print(f"  • Out-of-Stock Self-Healing Recipe: [green]OK[/green] (Substituted with '{substitute['name']}')")
+
+# 3. Budget Fence Test
+strict_budget_goal = GoalContract(
+    raw_prompt="Get snacks within 100 rs",
+    target_platform="zepto",
+    items=[{"name": "Snack", "quantity": 1}],
+    max_budget_inr=100.0,
+    acceptance_criteria=["items within 100 rs"]
+)
+ge = GoalOrchestrationEngine(llm_client=None)
+# Evaluate cart with total ₹317 against ₹100 cap
+fence_report = ge.evaluate_cart_state(strict_budget_goal, mock_items)
+assert not fence_report.satisfied, "Budget fence should have blocked overage!"
+assert any("Budget fence violation" in f for f in fence_report.failed_criteria), "Budget violation not reported!"
+console.print(f"  • Hard Budget Fence: [green]OK[/green] (Blocked ₹{subtotal:.2f} cart exceeding ₹100.00 cap)")
+console.print("  [bold green]✓ Self-Healing Recovery Recipes & Audit Ledger PASSED[/bold green]\n")
+
 console.print("[bold green]═══════════════════════════════════════════════════════════════[/bold green]")
 console.print("[bold green]      ALL LOCAL SUBSYSTEM TESTS PASSED WITH 100% SUCCESS!      [/bold green]")
 console.print("[bold green]═══════════════════════════════════════════════════════════════[/bold green]\n")
+

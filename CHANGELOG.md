@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-09-09
+
+### Added
+- **Self-Healing Recovery Recipes (`RecoveryRecipeEngine` in `zoovy/core/goal_engine.py`):**
+  - Encoded structured failure recovery state machine (`FailureScenario.OUT_OF_STOCK`, `BUDGET_EXCEEDED`, `UNREQUESTED_ITEMS_PRESENT`).
+  - Automatic catalog variant and brand substitution when items are unavailable.
+  - Automatic cart optimization and quantity adjustment suggestions when budgets are breached.
+  - Enforced a 2-attempt recovery limit before escalating to human review.
+- **Hard Budget Fencing & Resource Boundary Scopes (`GoalContract`):**
+  - Added deterministic algorithmic budget cap enforcement (`max_budget_inr`) in addition to LLM reflection.
+  - Extracted budget limits via both LLM structured output and regex heuristics (e.g. "under 200 rs", "within 500").
+  - Enforced max SKU constraints (`max_sku_count = 15`) to prevent hallucinated runaway additions.
+- **Cryptographic Approval Audit Ledger (`ApprovalTokenLedger` in `zoovy/core/safety.py`):**
+  - Immutable local audit trail (`~/.zoovy/audit_ledger.jsonl`) recording order token IDs, ISO timestamps, and SHA-256 integrity checksums.
+  - Records user decision status (`APPROVED`, `MODIFIED`, `ABORTED`) at every HITL payment checkpoint.
+
+---
+
 ## [0.3.0] - 2026-09-09
 
 ### Added

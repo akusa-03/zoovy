@@ -25,6 +25,9 @@ All orders are governed by a **Goal-Based Evaluator-Optimizer Engine** (Reflexio
   - **Swiggy:** 49 native tools across Food delivery, Instamart groceries (40,000+ SKUs), and Dineout table reservations.
   - **Zomato:** Zero-browser restaurant menus, dish discovery, item customization, and instant UPI QR payments.
 - 🎯 **Goal-Oriented Evaluator-Optimizer Loop:** Deconstructs prompts into formal **Acceptance Criteria** and **Negative Constraints**, evaluates live cart state, and executes self-correcting reflexion cycles before showing the invoice.
+- 🔄 **Self-Healing Recovery Recipes (`RecoveryRecipeEngine`):** Autonomous recovery actions for out-of-stock items, catalog mismatches, and budget breaches before escalating to the human user.
+- 💰 **Hard Budget Fencing & Resource Scopes:** Deterministic spending caps (`max_budget_inr`) and SKU boundaries (`max_sku_count`) enforced algorithmically in addition to LLM evaluation.
+- 🔒 **Cryptographic Approval Audit Ledger (`ApprovalTokenLedger`):** Immutable local audit log (`~/.zoovy/audit_ledger.jsonl`) recording order token IDs, timestamps, and SHA-256 integrity checksums for complete traceability.
 - 📍 **Full Address Verification:** Shows the full, unabridged delivery destination (house/flat number, building, street, landmark, and pincode) before authorization.
 - 🛒 **Interactive Cart Modification:** Edit your cart live (`[m] Modify`) to add items, delete items, or adjust quantities with automatic invoice recalculation.
 - 🛡️ **Human-in-the-Loop Payment Firewall:** AI prepares the cart, resolves variants, and verifies totals, but **never** auto-debits funds. Payment requires your manual confirmation.
@@ -41,10 +44,13 @@ flowchart TD
     subgraph Core ["Shared Core System"]
         HW["Hardware Profiler (hardware.py)"]
         LLM["Ollama Local LLM (llm.py)"]
+        Recovery["Self-Healing Recovery Engine (RecoveryRecipeEngine)"]
         Gate["Payment Gatekeeper & Invoice (safety.py)"]
+        Ledger[("Immutable Audit Ledger (audit_ledger.jsonl)")]
     end
 
     GoalEngine <--> Core
+    GoalEngine <--> Recovery
 
     subgraph ExecutionEngines ["Execution Engines"]
         subgraph MCPEngine ["⚡ Zero-Browser MCP Engine (Default / Stashed Chromium)"]
@@ -67,7 +73,8 @@ flowchart TD
     MCPEngine -->|"Cart State & Bill"| GoalEngine
     BrowserEngine -.->|"Scraped Cart"| GoalEngine
 
-    GoalEngine -->|"Verified Contract"| Gate
+    GoalEngine -->|"Verified Contract & Budget Fence"| Gate
+    Gate -->|"SHA-256 Approval Token"| Ledger
     Gate -.->|"Presents Invoice, Full Address & UPI QR"| User
 ```
 

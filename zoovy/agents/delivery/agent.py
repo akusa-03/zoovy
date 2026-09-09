@@ -6,7 +6,7 @@ from rich.panel import Panel
 
 from zoovy.core.llm import OllamaClient
 from zoovy.core.safety import PaymentGatekeeper, OrderCheckoutReview, CartItemSummary
-from zoovy.core.goal_engine import GoalOrchestrationEngine, GoalContract
+from zoovy.core.goal_engine import GoalOrchestrationEngine, GoalContract, RecoveryRecipeEngine, FailureScenario
 from zoovy.core.mcp_client import SwiggyMCPClient, ZomatoMCPClient, ZeptoMCPClient
 from zoovy.agents.delivery.schemas import OrderIntent, DeliveryPlatform
 
@@ -51,10 +51,11 @@ Output JSON schema:
         return OrderIntent(**parsed_json)
 
     def _execute_mcp_order(self, goal: GoalContract, goal_engine: GoalOrchestrationEngine):
-        """Zero-browser execution via Model Context Protocol (MCP) servers."""
+        """Zero-browser execution via Model Context Protocol (MCP) servers with self-healing recovery."""
         console.print(f"\n[bold green]⚡ Executing in Zero-Browser MCP Mode[/bold green]")
         console.print(f"[dim]Platform: {goal.target_platform.upper()} via JSON-RPC Protocol (No browser launched)[/dim]\n")
 
+        recovery = RecoveryRecipeEngine(max_attempts=2)
         cart_items: List[CartItemSummary] = []
         payment_ref = ""
         saved_addresses: List[str] = []
@@ -71,7 +72,13 @@ Output JSON schema:
                 name = it.get("name", "Item")
                 qty = it.get("quantity", 1)
                 results = mcp.search_products(name)
-                prod = results[0] if results else {"name": name, "unit_price_inr": 50.0, "variant": "Standard"}
+                if not results:
+                    alt_query = name.split()[0] if " " in name else name
+                    alts = mcp.search_products(alt_query)
+                    prod = recovery.resolve_out_of_stock(name, alts) or {"name": name, "unit_price_inr": 50.0, "variant": "Standard"}
+                else:
+                    prod = results[0]
+
                 mcp.add_to_cart(prod.get("name", name), quantity=qty)
                 unit_price = prod.get("unit_price_inr", 50.0)
                 cart_items.append(CartItemSummary(
@@ -100,7 +107,13 @@ Output JSON schema:
                 name = it.get("name", "Item")
                 qty = it.get("quantity", 1)
                 results = mcp.search_instamart(name)
-                prod = results[0] if results else {"name": name, "price_inr": 40.0, "variant": "Standard"}
+                if not results:
+                    alt_query = name.split()[0] if " " in name else name
+                    alts = mcp.search_instamart(alt_query)
+                    prod = recovery.resolve_out_of_stock(name, alts) or {"name": name, "price_inr": 40.0, "variant": "Standard"}
+                else:
+                    prod = results[0]
+
                 mcp.add_to_cart(prod.get("product_id", "prod_01"), quantity=qty)
                 unit_price = prod.get("price_inr", 40.0)
                 cart_items.append(CartItemSummary(
@@ -146,6 +159,13 @@ Output JSON schema:
                 console.print("[bold green]✓ Goal Evaluation Passed:[/bold green] All criteria satisfied.")
             else:
                 console.print(f"[yellow]⚠ Goal Evaluation Notes:[/yellow] {eval_report.reflection}")
+                for fc in eval_report.failed_criteria:
+                    console.print(f"   [bold red]✗[/bold red] {fc}")
+
+                # Automatic recovery for budget fence breaches
+                if goal.max_budget_inr and sum(i.total_price_inr for i in cart_items) > goal.max_budget_inr:
+                    if recovery.can_attempt(FailureScenario.BUDGET_EXCEEDED):
+                        recovery.resolve_budget_exceeded(goal, cart_items)
 
             subtotal = sum(i.total_price_inr for i in cart_items)
             review = OrderCheckoutReview(
